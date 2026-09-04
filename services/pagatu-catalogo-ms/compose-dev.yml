@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pagatu-postgres-catalogo-dev
+    environment:
+      POSTGRES_DB: ecomer_catalogo_db
+      POSTGRES_USER: pagatu
+      POSTGRES_PASSWORD: pagatu
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
