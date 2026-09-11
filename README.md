@@ -1,88 +1,161 @@
-# E-Comedor — Avance S3: Eureka + Catalogo-MS
+# QhaliMenu — Reserva anticipada de almuerzos
 
-Sistema Distribuido de Reserva Anticipada de Almuerzos. Este repositorio contiene el avance individual de la **Sesión S3 — Registro, descubrimiento y ejecución concurrente de servicios mediante Eureka** (referencia: [Sesión S03](https://262dist.github.io/pagatu/sesiones/S03_Registro_Descubrimiento_Ejecucion_Concurrente/)).
+Sistema distribuido de reserva anticipada de almuerzos. Identidad oficial: **QhaliMenu**.
+
+Producto de Unidad I: [docs/u1-producto.md](docs/u1-producto.md).
 
 ## Componentes
 
-| Componente | Ruta | Rol | Puerto |
+| Componente | Ruta | Rol | Puerto DEV |
 |---|---|---|---|
-| `pagatu-config` | `infra/pagatu-config` | Config Server (Spring Cloud Config) | `18888` |
-| `pagatu-eureka` | `infra/pagatu-eureka` | Eureka Server (Service Registry) | `18761` |
-| `pagatu-catalogo-ms` | `services/pagatu-catalogo-ms` | Microservicio de catálogo (cliente Eureka) | `8080` / `8081` |
+| `qhalimenu-config` | `infra/qhalimenu-config` | Config Server | `18888` |
+| `qhalimenu-eureka` | `infra/qhalimenu-eureka` | Eureka Server | `18761` |
+| `qhalimenu-gateway` | `infra/qhalimenu-gateway` | API Gateway + `lb://` | `18080` |
+| `qhalimenu-catalogo-ms` | `services/qhalimenu-catalogo-ms` | Categorías y productos | `8080` / `8081` |
+| `qhalimenu-orden-ms` | `services/qhalimenu-orden-ms` | Órdenes de reserva | `8082` / `8083` |
+| `qhalimenu-cliente-ms` | `services/qhalimenu-cliente-ms` | Compra exprés (DNI + nombre + celular) | `8084` / `8085` |
+| `qhalimenu-pago-ms` | `services/qhalimenu-pago-ms` | Pagos de órdenes | `8086` / `8087` |
 
-`config-repo` contiene la configuración centralizada (DEV/PROD) de cada servicio: `infra/pagatu-config/config-repo/`.
+Configuración centralizada: `infra/qhalimenu-config/config-repo/`.
 
-## Arquitectura
+Bases de datos DEV: `qhalimenu_catalogo_db` (`15432`), `qhalimenu_orden_db` (`15434`), `qhalimenu_cliente_db` (`15436`) y `qhalimenu_pago_db` (`15438`). Usuario: `qhalimenu`.
 
-```
-pagatu-config (18888)
-      |
-      | configuración centralizada
-      v
-pagatu-eureka (18761)  <--registra/descubre--
-      |                        |
-      |                        +--- pagatu-catalogo-ms:8080
-      |                        +--- pagatu-catalogo-ms:8081
-```
+## Requisitos
 
-Cada instancia de `pagatu-catalogo-ms` se registra a sí misma ante `pagatu-eureka` al arrancar, con su nombre lógico (`pagatu-catalogo-ms`) y su dirección real (`localhost:8080`, `localhost:8081`). Cualquier componente que consulte el registro encuentra ambas instancias por nombre lógico, sin necesidad de conocer los puertos de antemano.
+JDK 21 y Docker.
 
-## Ejecución
-
-Requisitos: JDK 21 y Docker (para la base de datos PostgreSQL del catálogo).
-
-### 1. Base de datos (catálogo)
+Si existían contenedores o volúmenes anteriores, recréalos para aplicar los nuevos nombres de BD:
 
 ```powershell
-cd services\pagatu-catalogo-ms
+cd services\qhalimenu-catalogo-ms
+docker compose -f compose-dev.yml down -v
+```
+
+## Inicio rápido (scripts)
+
+La forma más sencilla de levantar todo (bases de datos + 7 servicios) es:
+
+1. Doble clic en **`start-project.bat`** (Windows), o ejecuta:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\start-project.ps1
+   ```
+
+   El script:
+   - Levanta las 4 bases de datos PostgreSQL con `docker compose -f docker-compose.yml up -d`.
+   - Abre una terminal independiente por servicio, en el orden correcto:
+     Config Server → Eureka → Gateway → Catálogo → Órdenes → Clientes → Pagos.
+   - Cada terminal espera a que su prerequisito (Config Server / Eureka) esté listo antes de arrancar.
+   - Al final muestra el resumen de puertos y URLs de verificación.
+
+2. Verifica el estado:
+
+   | Qué | URL |
+   |---|---|
+   | Eureka (registros) | <http://localhost:18761> |
+   | Config | <http://localhost:18888/qhalimenu-catalogo-ms/dev> |
+   | Gateway | <http://localhost:18080/api/v1/productos> |
+   | Swagger | <http://localhost:8080/swagger-ui.html> → 8082, 8084, 8086 |
+
+> **Posible conflicto de puertos:** los contenedores `pagatu-*` que ya existan en la misma máquina ocupan los puertos `15432` (y otros). Si `docker compose up -d` falla, libera esos puertos o detén esos contenedores antes de levantar las bases de QhaliMenu.
+
+## Ejecución DEV
+
+### 1. Bases de datos
+
+```powershell
+cd services\qhalimenu-catalogo-ms
+docker compose -f compose-dev.yml up -d
+
+cd ..\qhalimenu-orden-ms
+docker compose -f compose-dev.yml up -d
+
+cd ..\qhalimenu-cliente-ms
+docker compose -f compose-dev.yml up -d
+
+cd ..\qhalimenu-pago-ms
 docker compose -f compose-dev.yml up -d
 ```
 
 ### 2. Config Server
 
 ```powershell
-cd infra\pagatu-config
+cd infra\qhalimenu-config
 .\mvnw.cmd spring-boot:run
 ```
 
 ### 3. Eureka Server
 
 ```powershell
-cd infra\pagatu-eureka
+cd infra\qhalimenu-eureka
 .\mvnw.cmd spring-boot:run
 ```
 
-### 4. Catalogo — Instancia 1 (8080)
+### 4. Catálogo (8080 y 8081)
 
 ```powershell
-cd services\pagatu-catalogo-ms
+cd services\qhalimenu-catalogo-ms
 .\mvnw.cmd spring-boot:run
-```
 
-### 5. Catalogo — Instancia 2 (8081)
-
-```powershell
-cd services\pagatu-catalogo-ms
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
+```
+
+### 5. Órdenes (8082 y 8083)
+
+```powershell
+cd services\qhalimenu-orden-ms
+.\mvnw.cmd spring-boot:run
+
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8083"
+```
+
+### 6. Clientes (8084 y 8085)
+
+```powershell
+cd services\qhalimenu-cliente-ms
+.\mvnw.cmd spring-boot:run
+
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8085"
+```
+
+### 7. Pagos (8086 y 8087)
+
+```powershell
+cd services\qhalimenu-pago-ms
+.\mvnw.cmd spring-boot:run
+
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8087"
+```
+
+### 8. Gateway
+
+```powershell
+cd infra\qhalimenu-gateway
+.\mvnw.cmd spring-boot:run
 ```
 
 ## Verificación
 
-- Dashboard Eureka: `http://localhost:18761`
-- `GET http://localhost:8080/api/v1/menus`
-- `GET http://localhost:8081/api/v1/menus`
-- Health: `http://localhost:8080/actuator/health` y `http://localhost:8081/actuator/health`
-
-Ambas instancias deben aparecer en el dashboard como `PAGATU-CATALOGO-MS` → `localhost:8080 UP` y `localhost:8081 UP`.
+- Config: `http://localhost:18888/qhalimenu-catalogo-ms/dev`, `/qhalimenu-orden-ms/dev`, `/qhalimenu-cliente-ms/dev` y `/qhalimenu-pago-ms/dev`
+- Eureka: `http://localhost:18761` — `QHALIMENU-CATALOGO-MS`, `QHALIMENU-ORDEN-MS`, `QHALIMENU-CLIENTE-MS`, `QHALIMENU-PAGO-MS`, `QHALIMENU-GATEWAY`
+- Gateway:
+  - `GET http://localhost:18080/api/v1/categorias`
+  - `GET http://localhost:18080/api/v1/productos`
+  - `GET http://localhost:18080/api/v1/ordenes`
+  - `GET http://localhost:18080/api/v1/clientes`
+  - `GET http://localhost:18080/api/v1/pagos`
+- Swagger DEV: `http://localhost:8080/swagger-ui.html`, `http://localhost:8082/swagger-ui.html`, `http://localhost:8084/swagger-ui.html` y `http://localhost:8086/swagger-ui.html`
+- Compra exprés (sin registro): `POST http://localhost:18080/api/v1/clientes` con `numeroDocumento`, `nombres` y `celular`. Consulta: `GET http://localhost:18080/api/v1/clientes/documento/{dni}`
+- Pagos: `POST http://localhost:18080/api/v1/pagos/crear-preferencia`. Si el token en Config Server es `TEST-YOUR-ACCESS-TOKEN` o MercadoPago falla, responde en modo simulación (`modoSimulacion: true`) con `initPoint` a `/api/v1/pagos/simulacion/{preferenceId}`. Para cobro real, cambia `mercadopago.access-token` en `qhalimenu-pago-ms-dev.yml`.
 
 ## Pruebas
 
 ```powershell
-cd infra\pagatu-config;   .\mvnw.cmd clean test
-cd infra\pagatu-eureka;   .\mvnw.cmd clean test
-cd services\pagatu-catalogo-ms; .\mvnw.cmd clean test
+cd infra\qhalimenu-config;          .\mvnw.cmd test
+cd infra\qhalimenu-eureka;          .\mvnw.cmd test
+cd infra\qhalimenu-gateway;         .\mvnw.cmd test
+cd services\qhalimenu-catalogo-ms;  .\mvnw.cmd test
+cd services\qhalimenu-orden-ms;     .\mvnw.cmd test
+cd services\qhalimenu-cliente-ms;   .\mvnw.cmd test
+cd services\qhalimenu-pago-ms;      .\mvnw.cmd test
 ```
-
-## Documentación detallada
-
-Ver [docs/avance-s3-eureka.md](docs/avance-s3-eureka.md) para la documentación completa de la presentación (objetivo, explicaciones de Eureka, Service Registry, Service Discovery, preguntas de defensa, etc.).

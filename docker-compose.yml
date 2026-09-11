@@ -1,0 +1,56 @@
+name: qhalimenu-db
+
+services:
+  postgres-catalogo:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qhalimenu_catalogo_db
+      POSTGRES_USER: qhalimenu
+      POSTGRES_PASSWORD: qhalimenu
+    ports:
+      - "15432:5432"
+    volumes:
+      - qhalimenu_catalogo_data:/var/lib/postgresql/data
+
+  postgres-orden:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qhalimenu_orden_db
+      POSTGRES_USER: qhalimenu
+      POSTGRES_PASSWORD: qhalimenu
+    ports:
+      - "15434:5432"
+    volumes:
+      - qhalimenu_orden_data:/var/lib/postgresql/data
+
+  postgres-cliente:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qhalimenu_cliente_db
+      POSTGRES_USER: qhalimenu
+      POSTGRES_PASSWORD: qhalimenu
+    ports:
+      - "15436:5432"
+    volumes:
+      - qhalimenu_cliente_data:/var/lib/postgresql/data
+
+  postgres-pago:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qhalimenu_pago_db
+      POSTGRES_USER: qhalimenu
+      POSTGRES_PASSWORD: qhalimenu
+    ports:
+      - "15438:5432"
+    volumes:
+      - qhalimenu_pago_data:/var/lib/postgresql/data
+
+volumes:
+  qhalimenu_catalogo_data:
+  qhalimenu_orden_data:
+  qhalimenu_cliente_data:
+  qhalimenu_pago_data:

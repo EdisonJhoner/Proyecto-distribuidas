@@ -1,0 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: qhalimenu-catalogo-categorias
+              uri: lb://qhalimenu-catalogo-ms
+              predicates:
+                - Path=/api/v1/categorias/**
+            - id: qhalimenu-catalogo-productos
+              uri: lb://qhalimenu-catalogo-ms
+              predicates:
+                - Path=/api/v1/productos/**
+            - id: qhalimenu-orden-ordenes
+              uri: lb://qhalimenu-orden-ms
+              predicates:
+                - Path=/api/v1/ordenes/**
+            - id: qhalimenu-cliente-clientes
+              uri: lb://qhalimenu-cliente-ms
+              predicates:
+                - Path=/api/v1/clientes/**
+            - id: qhalimenu-pago-pagos
+              uri: lb://qhalimenu-pago-ms
+              predicates:
+                - Path=/api/v1/pagos/**
+
+eureka:
+  instance:
+    instance-id: ${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: http://qhalimenu-eureka:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
