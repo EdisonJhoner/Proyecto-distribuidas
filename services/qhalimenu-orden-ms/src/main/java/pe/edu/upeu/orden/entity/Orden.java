@@ -22,7 +22,7 @@ public class Orden {
     private Long id;
 
     @Column(name = "id_cliente", nullable = false)
-    private Long idCliente;
+    private String idCliente;
 
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion;

@@ -1,0 +1,59 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: qhalimenu-auth-ms
+  datasource:
+    url: jdbc:postgresql://localhost:15440/qhalimenu_auth_db
+    username: qhalimenu
+    password: qhalimenu
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+qhalimenu:
+  jwt:
+    issuer: qhalimenu-auth-ms
+    expiracion-segundos: 3600
+    private-key: ${JWT_PRIVATE_KEY:}
+    public-key: ${JWT_PUBLIC_KEY:}
+
+eureka:
+  instance:
+    hostname: localhost
+    instance-id: ${spring.application.name}:${server.port}
+  client:
+    service-url:
+      defaultZone: http://localhost:18761/eureka
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    pe.edu.upeu.auth: DEBUG

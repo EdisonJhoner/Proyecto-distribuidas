@@ -17,6 +17,62 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 2000
+            read-timeout: 4000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://qhalimenu-keycloak:8080/realms/qhalimenu
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: qhalimenu-orden-ms
+      auto-offset-reset: earliest
+    listener:
+      ack-mode: record
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      catalogo:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+      cliente:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+  timelimiter:
+    instances:
+      catalogo:
+        timeout-duration: 4s
+        cancel-running-future: true
+      cliente:
+        timeout-duration: 4s
+        cancel-running-future: true
 
 eureka:
   instance:
@@ -39,3 +95,16 @@ management:
   endpoint:
     health:
       show-details: never
+
+qhalimenu:
+  kafka:
+    topic:
+      orden-eventos: ${KAFKA_TOPIC_ORDEN:orden-eventos}
+      pago-eventos: ${KAFKA_TOPIC_PAGO:pago-eventos}
+  outbox:
+    poll-delay-ms: 2000
+    initial-delay-ms: 3000
+  saga:
+    timeout-minutos: ${SAGA_TIMEOUT_MINUTOS:15}
+    reconciliacion-delay-ms: 60000
+    reconciliacion-initial-delay-ms: 30000

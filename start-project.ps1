@@ -52,13 +52,19 @@ function Test-PortInUse([int]$Port) {
     return (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) -ne $null
 }
 
-$dbPorts   = @(15432, 15434, 15436, 15438)
-$appPorts  = @(18888, 18761, 18080, 8080, 8082, 8084, 8086)
+$dbPorts   = @(15432, 15434, 15436, 15438, 15440)
+$kafkaPorts = @(19092, 18085)
+$appPorts  = @(18888, 18761, 18080, 8088, 8080, 8082, 8084, 8086)
 
 foreach ($p in $dbPorts) {
     if (Test-PortInUse $p) {
         Write-Host ("[AVISO] Puerto BD {0} esta en uso. Si lo ocupa otro proyecto (p.ej. contenedores 'pagatu-*')," -f $p) -ForegroundColor Yellow
         Write-Host '        la base de datos correspondiente no podra publicar ese puerto.' -ForegroundColor Yellow
+    }
+}
+foreach ($p in $kafkaPorts) {
+    if (Test-PortInUse $p) {
+        Write-Host ("[AVISO] Puerto Kafka {0} ya esta en uso (broker o Kafka UI). Liberalo para evitar conflictos." -f $p) -ForegroundColor Yellow
     }
 }
 foreach ($p in $appPorts) {
@@ -71,7 +77,7 @@ Write-Host ''
 # ---------------------------------------------------------------
 # 2) Bases de datos (Docker Compose)
 # ---------------------------------------------------------------
-Write-Host '==> [1/8] Levantando bases de datos (docker compose up -d)' -ForegroundColor Green
+Write-Host '==> [1/9] Levantando bases de datos (docker compose up -d)' -ForegroundColor Green
 Push-Location $Root
 docker compose -f docker-compose.yml up -d 2>&1 | Out-Host
 $dockerExit = $LASTEXITCODE
@@ -80,6 +86,16 @@ if ($dockerExit -ne 0) {
     Write-Host ''
     Write-Host '[AVISO] docker compose devolvio un error (posible conflicto de puertos).' -ForegroundColor Yellow
     Write-Host '        Revisa la salida anterior y libera los puertos ocupados.' -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------
+# 2b) Broker de mensajeria (Kafka KRaft + Kafka UI)
+# ---------------------------------------------------------------
+Write-Host ''
+Write-Host '==> [1b/9] Levantando broker Kafka y Kafka UI (infra\kafka)' -ForegroundColor Green
+docker compose -f (Join-Path $Root 'infra\kafka\compose-dev.yml') up -d 2>&1 | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '[AVISO] No se pudo levantar Kafka (revisa puertos 19092/18085).' -ForegroundColor Yellow
 }
 
 # ---------------------------------------------------------------
@@ -161,7 +177,20 @@ Write-Host '============================================================' -Foreg
 & .\mvnw.cmd spring-boot:run
 "@
 
-# Terminal 5: Catalogo (8080) -- espera a Config Server
+# Terminal 5: Auth (8088) -- espera a Config Server
+New-ServiceWindow 'QhaliMenu - Auth (8088)' @"
+$waitConfig
+Set-Location (Join-Path `$env:QHALI_ROOT 'services\qhalimenu-auth-ms')
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host '  QhaliMenu - Auth            http://localhost:8088'         -ForegroundColor Cyan
+Write-Host '  JWKS:     http://localhost:8088/api/v1/auth/jwks'          -ForegroundColor Cyan
+Write-Host '  Swagger:  http://localhost:8088/swagger-ui.html'           -ForegroundColor Cyan
+Write-Host '  Detener: Ctrl+C'                                           -ForegroundColor Cyan
+Write-Host '============================================================' -ForegroundColor Cyan
+& .\mvnw.cmd spring-boot:run
+"@
+
+# Terminal 6: Catalogo (8080) -- espera a Config Server
 New-ServiceWindow 'QhaliMenu - Catalogo (8080)' @"
 $waitConfig
 Set-Location (Join-Path `$env:QHALI_ROOT 'services\qhalimenu-catalogo-ms')
@@ -174,7 +203,7 @@ Write-Host '============================================================' -Foreg
 & .\mvnw.cmd spring-boot:run
 "@
 
-# Terminal 6: Orden (8082) -- espera a Config Server
+# Terminal 7: Orden (8082) -- espera a Config Server
 New-ServiceWindow 'QhaliMenu - Orden (8082)' @"
 $waitConfig
 Set-Location (Join-Path `$env:QHALI_ROOT 'services\qhalimenu-orden-ms')
@@ -186,7 +215,7 @@ Write-Host '============================================================' -Foreg
 & .\mvnw.cmd spring-boot:run
 "@
 
-# Terminal 7: Cliente (8084) -- espera a Config Server
+# Terminal 8: Cliente (8084) -- espera a Config Server
 New-ServiceWindow 'QhaliMenu - Cliente (8084)' @"
 $waitConfig
 Set-Location (Join-Path `$env:QHALI_ROOT 'services\qhalimenu-cliente-ms')
@@ -198,7 +227,7 @@ Write-Host '============================================================' -Foreg
 & .\mvnw.cmd spring-boot:run
 "@
 
-# Terminal 8: Pago (8086) -- espera a Config Server
+# Terminal 9: Pago (8086) -- espera a Config Server
 New-ServiceWindow 'QhaliMenu - Pago (8086)' @"
 $waitConfig
 Set-Location (Join-Path `$env:QHALI_ROOT 'services\qhalimenu-pago-ms')
@@ -218,21 +247,24 @@ Write-Host '============================================================' -Foreg
 Write-Host '  Ventanas de servicio abiertas. Resumen:'                    -ForegroundColor Green
 Write-Host '============================================================' -ForegroundColor Green
 Write-Host ''
-Write-Host '  [1] Bases de datos (Docker)         puertos 15432/15434/15436/15438'
+Write-Host '  [1] Bases de datos (Docker)         puertos 15432/15434/15436/15438/15440'
+Write-Host '      Kafka (Docker)                  broker 19092  -  Kafka UI http://localhost:18085'
 Write-Host '  [2] Config Server                   http://localhost:18888'
 Write-Host '  [3] Eureka Server                   http://localhost:18761'
 Write-Host '  [4] API Gateway                     http://localhost:18080'
-Write-Host '  [5] Catalogo  (ms)                  http://localhost:8080   (Swagger: /swagger-ui.html)'
-Write-Host '  [6] Orden     (ms)                  http://localhost:8082   (Swagger: /swagger-ui.html)'
-Write-Host '  [7] Cliente   (ms)                  http://localhost:8084   (Swagger: /swagger-ui.html)'
-Write-Host '  [8] Pago      (ms)                  http://localhost:8086   (Swagger: /swagger-ui.html)'
+Write-Host '  [5] Auth      (ms)                  http://localhost:8088   (JWKS: /api/v1/auth/jwks)'
+Write-Host '  [6] Catalogo  (ms)                  http://localhost:8080   (Swagger: /swagger-ui.html)'
+Write-Host '  [7] Orden     (ms)                  http://localhost:8082   (Swagger: /swagger-ui.html)'
+Write-Host '  [8] Cliente   (ms)                  http://localhost:8084   (Swagger: /swagger-ui.html)'
+Write-Host '  [9] Pago      (ms)                  http://localhost:8086   (Swagger: /swagger-ui.html)'
 Write-Host ''
 Write-Host '  Endpoints de prueba a traves del Gateway (puerto 18080):'
-Write-Host '    GET http://localhost:18080/api/v1/categorias'
-Write-Host '    GET http://localhost:18080/api/v1/productos'
-Write-Host '    GET http://localhost:18080/api/v1/ordenes'
-Write-Host '    GET http://localhost:18080/api/v1/clientes'
-Write-Host '    GET http://localhost:18080/api/v1/pagos'
+Write-Host '    POST http://localhost:18080/api/v1/auth/login    (obtener JWT)'
+Write-Host '    GET  http://localhost:18080/api/v1/categorias'
+Write-Host '    GET  http://localhost:18080/api/v1/productos'
+Write-Host '    GET  http://localhost:18080/api/v1/ordenes       (requiere token)'
+Write-Host '    GET  http://localhost:18080/api/v1/clientes      (requiere token)'
+Write-Host '    GET  http://localhost:18080/api/v1/pagos         (requiere token)'
 Write-Host ''
 Write-Host '  Detener el proyecto: Ctrl+C en cada terminal o cerrar sus ventanas.'
 Write-Host '============================================================' -ForegroundColor Green

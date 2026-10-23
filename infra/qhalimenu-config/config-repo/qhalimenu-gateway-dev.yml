@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: 18080
 
 spring:
@@ -7,6 +7,10 @@ spring:
       server:
         webmvc:
           routes:
+            - id: qhalimenu-auth
+              uri: lb://qhalimenu-auth-ms
+              predicates:
+                - Path=/api/v1/auth/**
             - id: qhalimenu-catalogo-categorias
               uri: lb://qhalimenu-catalogo-ms
               predicates:
@@ -27,6 +31,12 @@ spring:
               uri: lb://qhalimenu-pago-ms
               predicates:
                 - Path=/api/v1/pagos/**
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:18180/realms/qhalimenu
 
 eureka:
   instance:

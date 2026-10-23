@@ -4,6 +4,8 @@ Sistema distribuido de reserva anticipada de almuerzos. Identidad oficial: **Qha
 
 Producto de Unidad I: [docs/u1-producto.md](docs/u1-producto.md).
 
+Sesiones 6-9 (comunicación resiliente, seguridad JWT, Kafka, SAGA coreografiada): [docs/sesiones-06-09/](docs/sesiones-06-09/README.md).
+
 ## Componentes
 
 | Componente | Ruta | Rol | Puerto DEV |

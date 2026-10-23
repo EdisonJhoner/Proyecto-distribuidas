@@ -3,14 +3,17 @@ package pe.edu.upeu.cliente.service;
 import pe.edu.upeu.cliente.dto.ClienteRequest;
 import pe.edu.upeu.cliente.dto.ClienteResponse;
 import pe.edu.upeu.cliente.entity.Cliente;
+import pe.edu.upeu.cliente.exception.AccesoDenegadoException;
 import pe.edu.upeu.cliente.exception.ResourceNotFoundException;
 import pe.edu.upeu.cliente.mapper.ClienteMapper;
 import pe.edu.upeu.cliente.repository.ClienteRepository;
+import pe.edu.upeu.cliente.security.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +21,7 @@ public class ClienteService {
 
     private final ClienteRepository clienteRepository;
     private final ClienteMapper clienteMapper;
+    private final CurrentUserProvider currentUserProvider;
 
     @Transactional(readOnly = true)
     public List<ClienteResponse> listar() {
@@ -28,28 +32,41 @@ public class ClienteService {
 
     @Transactional(readOnly = true)
     public ClienteResponse obtener(Long id) {
-        return clienteMapper.toResponse(buscarOFallar(id));
+        Cliente cliente = buscarOFallar(id);
+        validarPropiedad(cliente.getId());
+        return clienteMapper.toResponse(cliente);
     }
 
     @Transactional(readOnly = true)
     public ClienteResponse obtenerPorDocumento(String numeroDocumento) {
-        return clienteRepository.findByNumeroDocumento(numeroDocumento)
-                .map(clienteMapper::toResponse)
+        Cliente cliente = clienteRepository.findByNumeroDocumento(numeroDocumento)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Cliente no encontrado para documento: " + numeroDocumento));
+        validarPropiedad(cliente.getId());
+        return clienteMapper.toResponse(cliente);
     }
 
     @Transactional
     public ClienteResponse asociarExpress(ClienteRequest request) {
         return clienteRepository.findByNumeroDocumento(request.getNumeroDocumento())
-                .map(existente -> actualizarDatosEntrega(existente, request))
-                .orElseGet(() -> clienteMapper.toResponse(
-                        clienteRepository.save(clienteMapper.toEntity(request))));
+                .map(existente -> {
+                    validarPropiedad(existente.getId());
+                    return actualizarDatosEntrega(existente, request);
+                })
+                .orElseGet(() -> {
+                    if (!currentUserProvider.esAdmin()) {
+                        throw new AccesoDenegadoException(
+                                "Solo un administrador puede registrar nuevos clientes");
+                    }
+                    return clienteMapper.toResponse(
+                            clienteRepository.save(clienteMapper.toEntity(request)));
+                });
     }
 
     @Transactional
     public ClienteResponse actualizar(Long id, ClienteRequest request) {
         Cliente cliente = buscarOFallar(id);
+        validarPropiedad(id);
         return actualizarDatosEntrega(cliente, request);
     }
 
@@ -68,5 +85,16 @@ public class ClienteService {
     private Cliente buscarOFallar(Long id) {
         return clienteRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado: " + id));
+    }
+
+    private void validarPropiedad(Long idClienteRecurso) {
+        if (currentUserProvider.esAdmin()) {
+            return;
+        }
+        Long idClienteToken = currentUserProvider.getIdCliente();
+        if (idClienteToken != null && Objects.equals(idClienteToken, idClienteRecurso)) {
+            return;
+        }
+        throw new AccesoDenegadoException("No tiene permisos para acceder a este cliente");
     }
 }

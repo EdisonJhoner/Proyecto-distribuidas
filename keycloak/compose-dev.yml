@@ -1,0 +1,51 @@
+﻿name: qhalimenu-keycloak-dev
+services:
+  keycloak-db:
+    image: postgres:17-alpine
+    container_name: qhalimenu-keycloak-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qhalimenu_keycloak
+      POSTGRES_USER: qhalimenu_keycloak
+      POSTGRES_PASSWORD: qhalimenu
+    ports:
+      - "15442:5432"
+    volumes:
+      - qhalimenu_keycloak_db_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qhalimenu_keycloak -d qhalimenu_keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: qhalimenu-keycloak
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin123
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/qhalimenu_keycloak
+      KC_DB_USERNAME: qhalimenu_keycloak
+      KC_DB_PASSWORD: qhalimenu
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_METRICS_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "18180:8080"
+      - "19000:9000"
+    volumes:
+      - qhalimenu_keycloak_dev_data:/opt/keycloak/data
+      - ./logs:/opt/keycloak/data/log
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
+volumes:
+  qhalimenu_keycloak_db_dev_data:
+  qhalimenu_keycloak_dev_data:

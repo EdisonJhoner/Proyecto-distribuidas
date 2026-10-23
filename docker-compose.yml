@@ -49,8 +49,21 @@ services:
     volumes:
       - qhalimenu_pago_data:/var/lib/postgresql/data
 
+  postgres-auth:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qhalimenu_auth_db
+      POSTGRES_USER: qhalimenu
+      POSTGRES_PASSWORD: qhalimenu
+    ports:
+      - "15440:5432"
+    volumes:
+      - qhalimenu_auth_data:/var/lib/postgresql/data
+
 volumes:
   qhalimenu_catalogo_data:
   qhalimenu_orden_data:
   qhalimenu_cliente_data:
   qhalimenu_pago_data:
+  qhalimenu_auth_data:

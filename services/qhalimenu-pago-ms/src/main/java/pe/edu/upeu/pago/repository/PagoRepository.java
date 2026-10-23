@@ -10,5 +10,7 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 
     List<Pago> findByOrdenId(Long ordenId);
 
+    Optional<Pago> findFirstByOrdenId(Long ordenId);
+
     Optional<Pago> findByPreferenceId(String preferenceId);
 }

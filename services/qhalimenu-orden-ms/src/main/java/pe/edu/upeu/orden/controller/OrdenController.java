@@ -2,6 +2,7 @@ package pe.edu.upeu.orden.controller;
 
 import pe.edu.upeu.orden.dto.OrdenRequest;
 import pe.edu.upeu.orden.dto.OrdenResponse;
+import pe.edu.upeu.orden.security.CurrentUserProvider;
 import pe.edu.upeu.orden.service.OrdenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.List;
 public class OrdenController {
 
     private final OrdenService ordenService;
+    private final CurrentUserProvider currentUserProvider;
 
     @GetMapping
     public List<OrdenResponse> listar() {
@@ -30,6 +32,6 @@ public class OrdenController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrdenResponse crear(@Valid @RequestBody OrdenRequest request) {
-        return ordenService.crear(request);
+        return ordenService.crear(request, currentUserProvider.getIdClienteString());
     }
 }

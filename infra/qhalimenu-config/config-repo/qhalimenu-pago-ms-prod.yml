@@ -17,6 +17,25 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://qhalimenu-auth-ms:8080/api/v1/auth/jwks
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: qhalimenu-pago-ms
+      auto-offset-reset: earliest
+    listener:
+      ack-mode: record
 
 eureka:
   instance:
@@ -50,3 +69,12 @@ mercadopago:
   notification-url: ${MERCADOPAGO_NOTIFICATION_URL:http://qhalimenu-gateway:8080/api/v1/pagos/webhook}
   simulation-base-url: ${MERCADOPAGO_SIMULATION_URL:http://qhalimenu-gateway:8080/api/v1/pagos/simulacion}
   simulation-id-prefix: ${MERCADOPAGO_SIMULATION_PREFIX:SIM-}
+
+qhalimenu:
+  kafka:
+    topic:
+      orden-eventos: ${KAFKA_TOPIC_ORDEN:orden-eventos}
+      pago-eventos: ${KAFKA_TOPIC_PAGO:pago-eventos}
+  outbox:
+    poll-delay-ms: 2000
+    initial-delay-ms: 3000

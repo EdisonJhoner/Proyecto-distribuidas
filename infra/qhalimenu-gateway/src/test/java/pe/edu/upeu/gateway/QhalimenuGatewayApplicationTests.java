@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.cloud.config.import-check.enabled=false",
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
+        "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:8088/api/v1/auth/jwks",
         "spring.cloud.gateway.server.webmvc.routes[0].id=qhalimenu-catalogo-categorias",
         "spring.cloud.gateway.server.webmvc.routes[0].uri=http://localhost:8080",
         "spring.cloud.gateway.server.webmvc.routes[0].predicates[0]=Path=/api/v1/categorias/**"

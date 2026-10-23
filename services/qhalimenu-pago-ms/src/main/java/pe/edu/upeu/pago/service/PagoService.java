@@ -12,6 +12,8 @@ import pe.edu.upeu.pago.config.MercadoPagoProperties;
 import pe.edu.upeu.pago.dto.PagoRequest;
 import pe.edu.upeu.pago.dto.PagoResponse;
 import pe.edu.upeu.pago.entity.Pago;
+import pe.edu.upeu.pago.event.OrdenCreadaEvento;
+import pe.edu.upeu.pago.event.PagoEventoPublisher;
 import pe.edu.upeu.pago.exception.ResourceNotFoundException;
 import pe.edu.upeu.pago.mapper.PagoMapper;
 import pe.edu.upeu.pago.repository.PagoRepository;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -32,6 +35,7 @@ public class PagoService {
     private final PagoRepository pagoRepository;
     private final PagoMapper pagoMapper;
     private final MercadoPagoProperties mercadoPagoProperties;
+    private final PagoEventoPublisher pagoEventoPublisher;
 
     @Transactional(readOnly = true)
     public List<PagoResponse> listar() {
@@ -50,6 +54,41 @@ public class PagoService {
         return pagoRepository.findByOrdenId(ordenId).stream()
                 .map(pagoMapper::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public Optional<Pago> registrarPagoDesdeOrden(OrdenCreadaEvento evento) {
+        Optional<Pago> existente = pagoRepository.findFirstByOrdenId(evento.ordenId());
+        if (existente.isPresent()) {
+            log.info("Ya existe un pago para la orden {}; evento '{}' ignorado (idempotente)",
+                    evento.ordenId(), evento.tipo());
+            return Optional.empty();
+        }
+        String metodoPago = evento.metodoPago() == null || evento.metodoPago().isBlank()
+                ? "MERCADOPAGO"
+                : evento.metodoPago();
+        String preferenceId = mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID();
+        Pago pago = Pago.builder()
+                .ordenId(evento.ordenId())
+                .monto(evento.total())
+                .metodoPago(metodoPago)
+                .estadoPago("PENDIENTE")
+                .preferenceId(preferenceId)
+                .fechaPago(LocalDateTime.now())
+                .build();
+        if (mercadoPagoProperties.usarSimulacion()) {
+            pago.setEstadoPago("PROCESADO");
+        }
+        Pago guardado = pagoRepository.save(pago);
+        publicarEventoSiCambioDeEstado(guardado, "PENDIENTE");
+        if ("PROCESADO".equals(guardado.getEstadoPago())) {
+            log.info("Pago {} registrado y validado (simulación) para la orden {}",
+                    guardado.getId(), guardado.getOrdenId());
+        } else {
+            log.info("Pago {} registrado PENDIENTE para la orden {}; se espera confirmación de MercadoPago",
+                    guardado.getId(), guardado.getOrdenId());
+        }
+        return Optional.of(guardado);
     }
 
     @Transactional
@@ -106,19 +145,25 @@ public class PagoService {
     public PagoResponse confirmarSimulacion(String preferenceId) {
         Pago pago = pagoRepository.findByPreferenceId(preferenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pago no encontrado para preference: " + preferenceId));
+        String estadoAnterior = pago.getEstadoPago();
         pago.setEstadoPago("PROCESADO");
         pago.setFechaPago(LocalDateTime.now());
+        Pago guardado = pagoRepository.save(pago);
+        publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
         String url = urlSimulacion(preferenceId);
-        return pagoMapper.toResponse(pagoRepository.save(pago), url, url, true);
+        return pagoMapper.toResponse(guardado, url, url, true);
     }
 
     @Transactional
     public PagoResponse procesarFeedback(String preferenceId, String collectionStatus, String status) {
         Pago pago = pagoRepository.findByPreferenceId(preferenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pago no encontrado para preference: " + preferenceId));
+        String estadoAnterior = pago.getEstadoPago();
         pago.setEstadoPago(mapearEstado(primerValor(collectionStatus, status)));
         pago.setFechaPago(LocalDateTime.now());
-        return pagoMapper.toResponse(pagoRepository.save(pago));
+        Pago guardado = pagoRepository.save(pago);
+        publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
+        return pagoMapper.toResponse(guardado);
     }
 
     @Transactional
@@ -127,10 +172,34 @@ public class PagoService {
             return;
         }
         pagoRepository.findByPreferenceId(preferenceId).ifPresent(pago -> {
+            String estadoAnterior = pago.getEstadoPago();
             pago.setEstadoPago(mapearEstado(primerValor(collectionStatus, status)));
             pago.setFechaPago(LocalDateTime.now());
-            pagoRepository.save(pago);
+            Pago guardado = pagoRepository.save(pago);
+            publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
         });
+    }
+
+    private void publicarEventoSiCambioDeEstado(Pago pago, String estadoAnterior) {
+        if (pago.getEstadoPago() == null || pago.getEstadoPago().equals(estadoAnterior)) {
+            return;
+        }
+        switch (pago.getEstadoPago()) {
+            case "PROCESADO" -> {
+                log.info("Pago {} de la orden {} pasó de {} a PROCESADO; se publica pago.validado",
+                        pago.getId(), pago.getOrdenId(), estadoAnterior);
+                pagoEventoPublisher.publicarValidado(
+                        pago.getOrdenId(), pago.getId(), pago.getPreferenceId(), pago.getMonto());
+            }
+            case "RECHAZADO" -> {
+                log.info("Pago {} de la orden {} pasó de {} a RECHAZADO; se publica pago.fallido",
+                        pago.getId(), pago.getOrdenId(), estadoAnterior);
+                pagoEventoPublisher.publicarFallido(
+                        pago.getOrdenId(), pago.getId(), pago.getPreferenceId(), pago.getMonto());
+            }
+            default -> log.debug("Pago {} quedó en estado {}; no se publica evento de SAGA",
+                    pago.getId(), pago.getEstadoPago());
+        }
     }
 
     private PagoResponse guardarSimulacion(PagoRequest request, String metodoPago) {
