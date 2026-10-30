@@ -21,7 +21,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: http://qhalimenu-auth-ms:8080/api/v1/auth/jwks
+          issuer-uri: http://qhalimenu-keycloak:8080/realms/qhalimenu
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:

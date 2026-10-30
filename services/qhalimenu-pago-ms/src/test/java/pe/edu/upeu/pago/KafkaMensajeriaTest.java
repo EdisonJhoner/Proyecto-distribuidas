@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
+        "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:0/jwks",
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "spring.kafka.consumer.group-id=qhalimenu-pago-ms",
         "spring.kafka.consumer.auto-offset-reset=earliest",

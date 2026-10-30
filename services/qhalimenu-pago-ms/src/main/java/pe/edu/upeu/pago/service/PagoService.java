@@ -32,6 +32,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PagoService {
 
+    public static final String METODO_EFECTIVO = "EFECTIVO";
+
     private final PagoRepository pagoRepository;
     private final PagoMapper pagoMapper;
     private final MercadoPagoProperties mercadoPagoProperties;
@@ -67,7 +69,9 @@ public class PagoService {
         String metodoPago = evento.metodoPago() == null || evento.metodoPago().isBlank()
                 ? "MERCADOPAGO"
                 : evento.metodoPago();
-        String preferenceId = mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID();
+        String preferenceId = esEfectivo(metodoPago)
+                ? null
+                : mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID();
         Pago pago = Pago.builder()
                 .ordenId(evento.ordenId())
                 .monto(evento.total())
@@ -76,13 +80,17 @@ public class PagoService {
                 .preferenceId(preferenceId)
                 .fechaPago(LocalDateTime.now())
                 .build();
-        if (mercadoPagoProperties.usarSimulacion()) {
+        if (mercadoPagoProperties.usarSimulacion() && !esEfectivo(metodoPago)) {
             pago.setEstadoPago("PROCESADO");
         }
         Pago guardado = pagoRepository.save(pago);
         publicarEventoSiCambioDeEstado(guardado, "PENDIENTE");
         if ("PROCESADO".equals(guardado.getEstadoPago())) {
             log.info("Pago {} registrado y validado (simulación) para la orden {}",
+                    guardado.getId(), guardado.getOrdenId());
+        } else if (esEfectivo(metodoPago)) {
+            log.info("Pago {} en EFECTIVO registrado PENDIENTE para la orden {}; " +
+                    "la orden seguirá en PENDIENTE_PAGO hasta que se confirme el cobro",
                     guardado.getId(), guardado.getOrdenId());
         } else {
             log.info("Pago {} registrado PENDIENTE para la orden {}; se espera confirmación de MercadoPago",
@@ -98,24 +106,42 @@ public class PagoService {
                     ? "MERCADOPAGO"
                     : request.getMetodoPago();
 
+            // Idempotencia por orden: el pago pudo haber sido creado por el evento 'orden.creada'.
+            Pago existente = request.getOrdenId() == null
+                    ? null
+                    : pagoRepository.findFirstByOrdenId(request.getOrdenId()).orElse(null);
+
+            if (existente != null && "PROCESADO".equals(existente.getEstadoPago())) {
+                log.info("El pago {} de la orden {} ya está PROCESADO; se reutiliza sin crear otro",
+                        existente.getId(), existente.getOrdenId());
+                return pagoMapper.toResponse(existente);
+            }
+
+            if (esEfectivo(metodoPago)) {
+                log.info("La orden {} usa pago en EFECTIVO; no se genera preferencia de pasarela",
+                        request.getOrdenId());
+                return guardarSimulacion(request, metodoPago, existente);
+            }
+
             if (mercadoPagoProperties.usarSimulacion()) {
-                return guardarSimulacion(request, metodoPago);
+                return guardarSimulacion(request, metodoPago, existente);
             }
 
             Preference preference = crearPreferenceMercadoPago(request);
             if (preference == null) {
                 log.warn("MercadoPago falló; se activa modo simulación para no interrumpir la compra");
-                return guardarSimulacion(request, metodoPago);
+                return guardarSimulacion(request, metodoPago, existente);
             }
 
-            Pago pago = Pago.builder()
-                    .ordenId(request.getOrdenId())
-                    .monto(request.getMonto())
-                    .metodoPago(metodoPago)
-                    .estadoPago("PENDIENTE")
-                    .preferenceId(preference.getId())
-                    .fechaPago(LocalDateTime.now())
-                    .build();
+            Pago pago = existente != null ? existente : Pago.builder().build();
+            pago.setOrdenId(request.getOrdenId());
+            if (request.getMonto() != null) {
+                pago.setMonto(request.getMonto());
+            }
+            pago.setMetodoPago(metodoPago);
+            pago.setEstadoPago("PENDIENTE");
+            pago.setPreferenceId(preference.getId());
+            pago.setFechaPago(LocalDateTime.now());
             return pagoMapper.toResponse(
                     pagoRepository.save(pago),
                     preference.getInitPoint(),
@@ -134,9 +160,6 @@ public class PagoService {
                     .ordenId(request.getOrdenId())
                     .estadoPago("PENDIENTE")
                     .modoSimulacion(true)
-                    .initPoint("https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=simulated_12345")
-                    .sandboxInitPoint("https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=simulated_12345")
-                    .preferenceId("simulated_12345")
                     .build();
         }
     }
@@ -152,6 +175,24 @@ public class PagoService {
         publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
         String url = urlSimulacion(preferenceId);
         return pagoMapper.toResponse(guardado, url, url, true);
+    }
+
+    @Transactional
+    public PagoResponse confirmarPago(Long id) {
+        Pago pago = buscarOFallar(id);
+        if (!esEfectivo(pago.getMetodoPago())) {
+            throw new IllegalStateException(
+                    "Solo se pueden confirmar manualmente los pagos en efectivo");
+        }
+        String estadoAnterior = pago.getEstadoPago();
+        if ("PROCESADO".equals(estadoAnterior)) {
+            return pagoMapper.toResponse(pago);
+        }
+        pago.setEstadoPago("PROCESADO");
+        pago.setFechaPago(LocalDateTime.now());
+        Pago guardado = pagoRepository.save(pago);
+        publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
+        return pagoMapper.toResponse(guardado);
     }
 
     @Transactional
@@ -202,17 +243,23 @@ public class PagoService {
         }
     }
 
-    private PagoResponse guardarSimulacion(PagoRequest request, String metodoPago) {
+    private PagoResponse guardarSimulacion(PagoRequest request, String metodoPago, Pago existente) {
+        Pago pago = existente != null ? existente : Pago.builder().build();
+        pago.setOrdenId(request.getOrdenId());
+        if (request.getMonto() != null) {
+            pago.setMonto(request.getMonto());
+        }
+        pago.setMetodoPago(metodoPago);
+        pago.setEstadoPago("PENDIENTE");
+        pago.setFechaPago(LocalDateTime.now());
+
+        if (esEfectivo(metodoPago)) {
+            return pagoMapper.toResponse(pagoRepository.save(pago));
+        }
+
         String preferenceId = mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID();
         String url = urlSimulacion(preferenceId);
-        Pago pago = Pago.builder()
-                .ordenId(request.getOrdenId())
-                .monto(request.getMonto())
-                .metodoPago(metodoPago)
-                .estadoPago("PENDIENTE")
-                .preferenceId(preferenceId)
-                .fechaPago(LocalDateTime.now())
-                .build();
+        pago.setPreferenceId(preferenceId);
         return pagoMapper.toResponse(pagoRepository.save(pago), url, url, true);
     }
 
@@ -288,6 +335,10 @@ public class PagoService {
             return primero;
         }
         return segundo;
+    }
+
+    private boolean esEfectivo(String metodoPago) {
+        return metodoPago != null && METODO_EFECTIVO.equalsIgnoreCase(metodoPago.trim());
     }
 
     private Pago buscarOFallar(Long id) {

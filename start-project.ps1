@@ -3,7 +3,8 @@
 #  ---------------------------------------------------------------------
 #  Abre una terminal independiente por cada servicio, en el orden
 #  correcto, y espera a que cada prerequisito este listo antes de
-#  arrancar el siguiente nivel (Config -> Eureka -> Gateway -> servicios).
+#  arrancar el siguiente nivel (Docker/Keycloak/Kafka -> Config ->
+#  Eureka -> Gateway -> servicios -> frontend Angular).
 #
 #  Uso:
 #    - Doble clic en start-project.bat   (recomendado)
@@ -44,6 +45,9 @@ if (-not (Get-Command powershell.exe -ErrorAction SilentlyContinue)) {
     Read-Host 'Presiona Enter para salir'
     exit 1
 }
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    Write-Host '[AVISO] npm no esta en el PATH: la terminal del frontend Angular fallara.' -ForegroundColor Yellow
+}
 
 # ---------------------------------------------------------------
 # 1) Verificacion de puertos libres
@@ -52,9 +56,9 @@ function Test-PortInUse([int]$Port) {
     return (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) -ne $null
 }
 
-$dbPorts   = @(15432, 15434, 15436, 15438, 15440)
+$dbPorts   = @(15432, 15434, 15436, 15438, 15440, 15442)
 $kafkaPorts = @(19092, 18085)
-$appPorts  = @(18888, 18761, 18080, 8088, 8080, 8082, 8084, 8086)
+$appPorts  = @(18888, 18761, 18080, 8088, 8080, 8082, 8084, 8086, 4200, 18180, 19000)
 
 foreach ($p in $dbPorts) {
     if (Test-PortInUse $p) {
@@ -77,7 +81,7 @@ Write-Host ''
 # ---------------------------------------------------------------
 # 2) Bases de datos (Docker Compose)
 # ---------------------------------------------------------------
-Write-Host '==> [1/9] Levantando bases de datos (docker compose up -d)' -ForegroundColor Green
+Write-Host '==> [1/10] Levantando bases de datos (docker compose up -d)' -ForegroundColor Green
 Push-Location $Root
 docker compose -f docker-compose.yml up -d 2>&1 | Out-Host
 $dockerExit = $LASTEXITCODE
@@ -92,10 +96,33 @@ if ($dockerExit -ne 0) {
 # 2b) Broker de mensajeria (Kafka KRaft + Kafka UI)
 # ---------------------------------------------------------------
 Write-Host ''
-Write-Host '==> [1b/9] Levantando broker Kafka y Kafka UI (infra\kafka)' -ForegroundColor Green
+Write-Host '==> [1b/10] Levantando broker Kafka y Kafka UI (infra\kafka)' -ForegroundColor Green
 docker compose -f (Join-Path $Root 'infra\kafka\compose-dev.yml') up -d 2>&1 | Out-Host
 if ($LASTEXITCODE -ne 0) {
     Write-Host '[AVISO] No se pudo levantar Kafka (revisa puertos 19092/18085).' -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------
+# 2c) Keycloak (emisor de tokens OIDC) + su base de datos
+# ---------------------------------------------------------------
+Write-Host ''
+Write-Host '==> [1c/10] Levantando Keycloak y su base de datos (keycloak\compose-dev.yml)' -ForegroundColor Green
+docker compose -f (Join-Path $Root 'keycloak\compose-dev.yml') up -d 2>&1 | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '[AVISO] No se pudo levantar Keycloak (revisa puertos 18180/19000/15442).' -ForegroundColor Yellow
+}
+$keycloakReady = $false
+for ($i = 0; $i -lt 90; $i++) {
+    try {
+        $r = Invoke-WebRequest -Uri 'http://localhost:19000/health/ready' -UseBasicParsing -TimeoutSec 2
+        if ($r.StatusCode -eq 200) { $keycloakReady = $true; break }
+    } catch { }
+    Start-Sleep -Seconds 2
+}
+if ($keycloakReady) {
+    Write-Host '    Keycloak listo en http://localhost:18180 (realm qhalimenu)' -ForegroundColor Green
+} else {
+    Write-Host '[AVISO] Keycloak no respondio. Los servicios no podran validar tokens.' -ForegroundColor Yellow
 }
 
 # ---------------------------------------------------------------
@@ -136,6 +163,21 @@ for ($i = 0; $i -lt 90; $i++) {
 }
 if (-not $ready) {
     Write-Host 'ADVERTENCIA: Eureka no respondio antes de iniciar el Gateway.' -ForegroundColor Yellow
+}
+'@
+
+$waitKeycloak = @'
+$kcUrl = 'http://localhost:19000/health/ready'
+$ready = $false
+for ($i = 0; $i -lt 90; $i++) {
+    try {
+        $r = Invoke-WebRequest -Uri $kcUrl -UseBasicParsing -TimeoutSec 2
+        if ($r.StatusCode -eq 200) { $ready = $true; break }
+    } catch { }
+    Start-Sleep -Seconds 2
+}
+if (-not $ready) {
+    Write-Host 'ADVERTENCIA: Keycloak no respondio.' -ForegroundColor Yellow
 }
 '@
 
@@ -239,6 +281,18 @@ Write-Host '============================================================' -Foreg
 & .\mvnw.cmd spring-boot:run
 "@
 
+# Terminal 10: Frontend Angular (4200) -- espera a Keycloak
+New-ServiceWindow 'QhaliMenu - Frontend (4200)' @"
+$waitKeycloak
+Set-Location (Join-Path `$env:QHALI_ROOT 'clients\qhalimenu-frontend')
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host '  QhaliMenu - Frontend        http://localhost:4200'         -ForegroundColor Cyan
+Write-Host '  Login Keycloak:             http://localhost:18180'        -ForegroundColor Cyan
+Write-Host '  Detener: Ctrl+C'                                           -ForegroundColor Cyan
+Write-Host '============================================================' -ForegroundColor Cyan
+& npm start -- --port 4200
+"@
+
 # ---------------------------------------------------------------
 # 4) Resumen
 # ---------------------------------------------------------------
@@ -247,24 +301,29 @@ Write-Host '============================================================' -Foreg
 Write-Host '  Ventanas de servicio abiertas. Resumen:'                    -ForegroundColor Green
 Write-Host '============================================================' -ForegroundColor Green
 Write-Host ''
-Write-Host '  [1] Bases de datos (Docker)         puertos 15432/15434/15436/15438/15440'
+Write-Host '  [1] Bases de datos (Docker)         puertos 15432/15434/15436/15438/15440/15442'
 Write-Host '      Kafka (Docker)                  broker 19092  -  Kafka UI http://localhost:18085'
+Write-Host '      Keycloak (Docker)               http://localhost:18180  (admin / admin123)'
 Write-Host '  [2] Config Server                   http://localhost:18888'
 Write-Host '  [3] Eureka Server                   http://localhost:18761'
 Write-Host '  [4] API Gateway                     http://localhost:18080'
-Write-Host '  [5] Auth      (ms)                  http://localhost:8088   (JWKS: /api/v1/auth/jwks)'
+Write-Host '  [5] Auth      (ms, legado)          http://localhost:8088   (Swagger: /swagger-ui.html)'
 Write-Host '  [6] Catalogo  (ms)                  http://localhost:8080   (Swagger: /swagger-ui.html)'
 Write-Host '  [7] Orden     (ms)                  http://localhost:8082   (Swagger: /swagger-ui.html)'
 Write-Host '  [8] Cliente   (ms)                  http://localhost:8084   (Swagger: /swagger-ui.html)'
 Write-Host '  [9] Pago      (ms)                  http://localhost:8086   (Swagger: /swagger-ui.html)'
+Write-Host '  [10] Frontend Angular               http://localhost:4200'
+Write-Host ''
+Write-Host '  Los tokens ahora los emite Keycloak (realm qhalimenu, client qhalimenu-frontend).'
+Write-Host '  Usuarios de prueba: cliente1 / Cliente123!  y  admin / Admin123!'
 Write-Host ''
 Write-Host '  Endpoints de prueba a traves del Gateway (puerto 18080):'
-Write-Host '    POST http://localhost:18080/api/v1/auth/login    (obtener JWT)'
-Write-Host '    GET  http://localhost:18080/api/v1/categorias'
-Write-Host '    GET  http://localhost:18080/api/v1/productos'
-Write-Host '    GET  http://localhost:18080/api/v1/ordenes       (requiere token)'
-Write-Host '    GET  http://localhost:18080/api/v1/clientes      (requiere token)'
-Write-Host '    GET  http://localhost:18080/api/v1/pagos         (requiere token)'
+Write-Host '    GET  http://localhost:18080/api/v1/categorias    (publico)'
+Write-Host '    GET  http://localhost:18080/api/v1/productos     (publico)'
+Write-Host '    GET  http://localhost:18080/api/v1/ordenes/mis-ordenes  (CLIENTE)'
+Write-Host '    GET  http://localhost:18080/api/v1/ordenes       (ADMIN)'
+Write-Host '    GET  http://localhost:18080/api/v1/clientes      (ADMIN)'
+Write-Host '    GET  http://localhost:18080/api/v1/pagos         (ADMIN)'
 Write-Host ''
 Write-Host '  Detener el proyecto: Ctrl+C en cada terminal o cerrar sus ventanas.'
 Write-Host '============================================================' -ForegroundColor Green

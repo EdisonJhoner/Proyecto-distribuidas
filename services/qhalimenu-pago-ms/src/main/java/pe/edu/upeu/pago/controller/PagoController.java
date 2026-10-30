@@ -61,6 +61,11 @@ public class PagoController {
         return pagoService.obtener(id);
     }
 
+    @PostMapping("/{id}/confirmar")
+    public PagoResponse confirmar(@PathVariable Long id) {
+        return pagoService.confirmarPago(id);
+    }
+
     @PostMapping("/crear-preferencia")
     public ResponseEntity<PagoResponse> crearPreferencia(@RequestBody(required = false) PagoRequest request) {
         try {

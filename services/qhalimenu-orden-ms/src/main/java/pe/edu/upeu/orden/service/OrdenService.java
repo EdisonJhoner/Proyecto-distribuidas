@@ -52,6 +52,16 @@ public class OrdenService {
     }
 
     @Transactional(readOnly = true)
+    public List<OrdenResponse> listarPorCliente(String idCliente) {
+        if (idCliente == null || idCliente.isBlank()) {
+            throw new NegocioException("El token no contiene el subject del usuario");
+        }
+        return ordenRepository.findByIdClienteConDetalles(idCliente).stream()
+                .map(ordenMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public OrdenResponse obtener(Long id) {
         Orden orden = buscarOFallar(id);
         validarPropiedadOrden(orden);

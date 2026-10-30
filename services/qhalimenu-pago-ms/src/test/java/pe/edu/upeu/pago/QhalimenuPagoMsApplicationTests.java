@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
+        "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:0/jwks",
         "mercadopago.access-token=TEST-YOUR-ACCESS-TOKEN",
         "mercadopago.placeholder-token=TEST-YOUR-ACCESS-TOKEN",
         "mercadopago.currency-id=PEN",

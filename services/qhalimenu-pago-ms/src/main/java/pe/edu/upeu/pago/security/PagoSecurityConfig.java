@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -17,9 +16,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class PagoSecurityConfig {
@@ -28,7 +24,6 @@ public class PagoSecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -43,6 +38,7 @@ public class PagoSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/pagos/orden/**").hasAnyRole("CLIENTE", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/pagos/crear-preferencia")
                         .hasAnyRole("CLIENTE", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/pagos/*/confirmar").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/pagos/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -56,29 +52,24 @@ public class PagoSecurityConfig {
         return converter;
     }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Authorization"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-
     static class RolesClaimConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
         @Override
         public Collection<GrantedAuthority> convert(Jwt jwt) {
-            List<String> roles = jwt.getClaimAsStringList("roles");
-            if (roles == null) {
-                return List.of();
+            java.util.Collection<String> roles = new java.util.ArrayList<>();
+            Object realmAccess = jwt.getClaim("realm_access");
+            if (realmAccess instanceof java.util.Map<?, ?> map) {
+                Object realmRoles = map.get("roles");
+                if (realmRoles instanceof Collection<?> list) {
+                    list.forEach(rol -> roles.add(String.valueOf(rol)));
+                }
+            }
+            List<String> directRoles = jwt.getClaimAsStringList("roles");
+            if (directRoles != null) {
+                roles.addAll(directRoles);
             }
             return roles.stream()
+                    .distinct()
                     .map(rol -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + rol))
                     .toList();
         }

@@ -18,15 +18,20 @@ export class KeycloakService {
       onLoad: 'check-sso',
       silentCheckSsoRedirectUri: window.location.origin + '/assets/silent-check-sso.html',
       pkceMethod: 'S256'
-    });
+    }).catch(() => false);
   }
 
   login(): void {
-    this.keycloak?.login();
+    this.keycloak?.login({ redirectUri: window.location.origin });
   }
 
   logout(): void {
     this.keycloak?.logout({ redirectUri: window.location.origin });
+  }
+
+  hasRole(role: string): boolean {
+    const roles: string[] = this.keycloak?.tokenParsed?.['realm_access']?.['roles'] ?? [];
+    return roles.includes(role);
   }
 
   isLoggedIn(): boolean {
@@ -39,5 +44,9 @@ export class KeycloakService {
 
   getUsername(): string | undefined {
     return this.keycloak?.tokenParsed?.['preferred_username'];
+  }
+
+  getEmail(): string | undefined {
+    return this.keycloak?.tokenParsed?.['email'];
   }
 }

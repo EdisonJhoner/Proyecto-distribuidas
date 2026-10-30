@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
+        "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:0/jwks",
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "spring.kafka.consumer.group-id=qhalimenu-pago-ms",
         "spring.kafka.consumer.auto-offset-reset=earliest",
@@ -98,6 +99,16 @@ class SagaPagoTest {
     }
 
     @Test
+    void ordenCreadaEnEfectivoQuedaPendienteHastaConfirmarElCobro() throws Exception {
+        kafkaTemplate.send("orden-eventos", "800", ordenCreadaEfectivo(800L)).get(10, TimeUnit.SECONDS);
+
+        Pago pago = esperarPago(800L);
+        assertEquals("PENDIENTE", pago.getEstadoPago(),
+                "Un pago en efectivo no debe aprobarse automáticamente");
+        assertEquals("EFECTIVO", pago.getMetodoPago());
+    }
+
+    @Test
     void ordenCreadaPublicadaPorOutboxEsConsumidaYDeserializada() throws Exception {
         outboxEventoService.encolar(
                 "orden-eventos", "700", "ORDEN", OrdenCreadaEvento.TIPO, ordenCreada(700L));
@@ -117,6 +128,20 @@ class SagaPagoTest {
                 "PENDIENTE_PAGO",
                 Instant.now(),
                 List.of(new OrdenItemEvento(10L, 2, new BigDecimal("15.00"))));
+    }
+
+    private OrdenCreadaEvento ordenCreadaEfectivo(Long ordenId) {
+        return new OrdenCreadaEvento(
+                UUID.randomUUID().toString(),
+                OrdenCreadaEvento.TIPO,
+                ordenId,
+                "1",
+                new BigDecimal("18.00"),
+                "EFECTIVO",
+                "ANTICIPADO",
+                "PENDIENTE_PAGO",
+                Instant.now(),
+                List.of(new OrdenItemEvento(10L, 1, new BigDecimal("18.00"))));
     }
 
     private Pago esperarPago(Long ordenId) throws InterruptedException {

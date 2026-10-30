@@ -1,4 +1,4 @@
-﻿package pe.edu.upeu.gateway.config;
+package pe.edu.upeu.gateway.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -67,15 +67,24 @@ public class SecurityConfig {
 
         @Override
         public Collection<GrantedAuthority> convert(Jwt jwt) {
-            Collection<GrantedAuthority> authorities = new java.util.ArrayList<>();
-            List<String> roles = jwt.getClaimAsStringList("realm_access.roles");
-            if (roles == null) {
-                roles = jwt.getClaimAsStringList("roles");
+            Collection<String> roles = new java.util.ArrayList<>();
+            // Keycloak expone los roles de realm dentro del claim anidado realm_access.roles
+            Object realmAccess = jwt.getClaim("realm_access");
+            if (realmAccess instanceof java.util.Map<?, ?> map) {
+                Object realmRoles = map.get("roles");
+                if (realmRoles instanceof Collection<?> list) {
+                    list.forEach(rol -> roles.add(String.valueOf(rol)));
+                }
             }
-            if (roles != null) {
-                roles.forEach(rol -> authorities.add(new SimpleGrantedAuthority("ROLE_" + rol)));
+            // Compatibilidad con emisores que publican un claim plano "roles"
+            List<String> directRoles = jwt.getClaimAsStringList("roles");
+            if (directRoles != null) {
+                roles.addAll(directRoles);
             }
-            return authorities;
+            return roles.stream()
+                    .distinct()
+                    .map(rol -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + rol))
+                    .toList();
         }
     }
 }

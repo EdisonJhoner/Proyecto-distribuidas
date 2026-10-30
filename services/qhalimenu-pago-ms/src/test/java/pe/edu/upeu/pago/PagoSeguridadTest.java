@@ -11,6 +11,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import pe.edu.upeu.pago.entity.Pago;
+import pe.edu.upeu.pago.repository.PagoRepository;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -47,6 +52,9 @@ class PagoSeguridadTest {
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    @Autowired
+    private PagoRepository pagoRepository;
 
     private static RequestPostProcessor clienteToken() {
         return jwt().jwt(builder -> builder
@@ -104,6 +112,26 @@ class PagoSeguridadTest {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ordenId").value(1));
+    }
+
+    @Test
+    void confirmarEfectivoEsExclusivoDeAdmin() throws Exception {
+        Pago pago = pagoRepository.save(Pago.builder()
+                .ordenId(999L)
+                .monto(new BigDecimal("15.00"))
+                .metodoPago("EFECTIVO")
+                .estadoPago("PENDIENTE")
+                .fechaPago(LocalDateTime.now())
+                .build());
+
+        mockMvc.perform(post("/api/v1/pagos/" + pago.getId() + "/confirmar")
+                        .with(clienteToken()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/pagos/" + pago.getId() + "/confirmar")
+                        .with(adminToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPago").value("PROCESADO"));
     }
 
     @Test

@@ -24,6 +24,11 @@ public class OrdenController {
         return ordenService.listar();
     }
 
+    @GetMapping("/mis-ordenes")
+    public List<OrdenResponse> listarMisOrdenes() {
+        return ordenService.listarPorCliente(currentUserProvider.getIdClienteString());
+    }
+
     @GetMapping("/{id}")
     public OrdenResponse obtener(@PathVariable Long id) {
         return ordenService.obtener(id);
