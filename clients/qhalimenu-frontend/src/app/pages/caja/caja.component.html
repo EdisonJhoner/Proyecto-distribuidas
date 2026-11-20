@@ -21,13 +21,13 @@
         <span class="stat-card__icon"><app-icon name="package" [size]="19" /></span>
         <span class="stat-card__label">Por recoger</span>
         <span class="stat-card__value">{{ totalPendientes() }}</span>
-        <span class="stat-card__hint">Órdenes pagadas en cola</span>
+        <span class="stat-card__hint">Pagadas + efectivo por cobrar</span>
       </article>
       <article class="stat-card">
         <span class="stat-card__icon"><app-icon name="cash" [size]="19" /></span>
         <span class="stat-card__label">Monto en cola</span>
         <span class="stat-card__value">S/ {{ montoPendiente() | number:'1.2-2' }}</span>
-        <span class="stat-card__hint">Total de reservas pagadas</span>
+        <span class="stat-card__hint">Pagadas + efectivo por cobrar</span>
       </article>
       <article class="stat-card stat-card--accent">
         <span class="stat-card__icon"><app-icon name="qr" [size]="19" /></span>
@@ -100,8 +100,9 @@
 
         <div class="note">
           <app-icon name="info" [size]="15" style="vertical-align: -2px;" />
-          La entrega se habilita únicamente cuando la orden está <strong>pagada</strong>.
-          Si el pago figura pendiente, confírmalo primero desde administración.
+          Las reservas en efectivo aparecen aquí con su código y se cobran en este módulo.
+          La <strong>entrega</strong> se habilita recién cuando registras el cobro; no necesitas
+          pasar por administración.
         </div>
       </section>
 
@@ -149,6 +150,15 @@
             <div class="toolbar" style="justify-content: space-between; border-top: 1px solid var(--qm-line); padding-top: 0.9rem;">
               <span class="order-card__total">S/ {{ reserva.total | number:'1.2-2' }}</span>
               <div class="toolbar">
+                @if (esEfectivoPendiente()) {
+                  <button type="button" class="btn btn-primary" (click)="cobrarEfectivo()" [disabled]="cobrando() || actuando() !== null">
+                    @if (cobrando()) {
+                      <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Cobrando…
+                    } @else {
+                      <app-icon name="cash" [size]="17" /> Cobrar efectivo
+                    }
+                  </button>
+                }
                 @if (puedeEntregar()) {
                   <button type="button" class="btn btn-primary" (click)="entregar()" [disabled]="actuando() !== null">
                     @if (actuando() === 'entregar') {
@@ -183,7 +193,11 @@
             } @else if (reserva.estado === 'PENDIENTE_PAGO') {
               <div class="alert alert-warning mb-0">
                 <app-icon name="clock" [size]="18" />
-                <span>El pago aún no está confirmado. No se puede entregar todavía.</span>
+                @if (esEfectivoPendiente()) {
+                  <span>Efectivo por cobrar en caja. Registra el cobro para habilitar la entrega.</span>
+                } @else {
+                  <span>El pago aún no está confirmado. No se puede entregar todavía.</span>
+                }
               </div>
             }
 

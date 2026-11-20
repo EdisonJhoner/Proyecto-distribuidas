@@ -40,7 +40,7 @@ export class PagoFlujoService {
       return {
         estado: 'PENDIENTE',
         orden,
-        mensaje: 'Reserva registrada. El pago en efectivo se confirma en caja.'
+        mensaje: 'Reserva registrada. Muestra tu código en caja para pagar en efectivo.'
       };
     }
 

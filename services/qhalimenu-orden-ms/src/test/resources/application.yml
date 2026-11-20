@@ -1,0 +1,4 @@
+spring:
+  config:
+    # Los tests no necesitan el Config Server: usan propiedades propias (H2, Kafka embebido, JWT mock).
+    import: "optional:configserver:"

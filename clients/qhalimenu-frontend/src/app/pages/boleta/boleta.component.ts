@@ -130,7 +130,7 @@ export class BoletaComponent implements OnInit {
     const orden = this.orden();
     if (!orden || this.pagando()) return;
     if (this.metodoEsEfectivo()) {
-      this.toast.info('Pago en efectivo', 'Acércate a caja. Un administrador confirmará el cobro.');
+      this.toast.info('Pago en efectivo', 'Muestra tu código en caja; el cajero registrará el cobro.');
       return;
     }
 

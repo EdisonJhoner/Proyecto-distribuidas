@@ -209,7 +209,17 @@ public class PagoService {
 
     @Transactional
     public PagoResponse confirmarPago(Long id) {
-        Pago pago = buscarOFallar(id);
+        return confirmarEfectivo(buscarOFallar(id));
+    }
+
+    @Transactional
+    public PagoResponse confirmarEfectivoPorOrden(Long ordenId) {
+        Pago pago = pagoRepository.findFirstByOrdenId(ordenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pago no encontrado para la orden: " + ordenId));
+        return confirmarEfectivo(pago);
+    }
+
+    private PagoResponse confirmarEfectivo(Pago pago) {
         if (!esEfectivo(pago.getMetodoPago())) {
             throw new IllegalStateException(
                     "Solo se pueden confirmar manualmente los pagos en efectivo");

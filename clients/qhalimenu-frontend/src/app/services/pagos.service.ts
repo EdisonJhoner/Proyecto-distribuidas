@@ -29,6 +29,10 @@ export class PagosService {
     return this.http.post<Pago>(`${this.base}/orden/${ordenId}/confirmar-billetera`, {});
   }
 
+  confirmarEfectivo(ordenId: number): Observable<Pago> {
+    return this.http.post<Pago>(`${this.base}/orden/${ordenId}/confirmar-efectivo`, {});
+  }
+
   confirmarPago(id: number): Observable<Pago> {
     return this.http.post<Pago>(`${this.base}/${id}/confirmar`, {});
   }

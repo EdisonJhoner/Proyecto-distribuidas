@@ -21,7 +21,7 @@ Equipo: Edison Jhoner Paye Mamani · Jhosef Giampiere Cuadros Flores.
 | S6 | Comunicación síncrona resiliente entre servicios (respuesta controlada ante fallos). | `qhalimenu-orden-ms` llama a `qhalimenu-catalogo-ms` y `qhalimenu-cliente-ms` por OpenFeign (`name` lógico en Eureka, no URL fija). `CatalogoResiliente` / `ClienteResiliente` envuelven la llamada con Circuit Breaker. Si catálogo cae, la creación de la orden responde `ServicioNoDisponibleException` (no se cuelga ni deja una orden con precios inventados). |
 | S7 / S07b | Seguridad distribuida y protección de rutas. | S7: `qhalimenu-auth-ms` emitía JWT RS256 + JWKS. S07b: Keycloak (`realm qhalimenu`, `:18180`) es el emisor real. Gateway, `orden-ms`, `cliente-ms` y `pago-ms` son Resource Server con `issuer-uri` de Keycloak. Cada MS valida el token (no solo el Gateway). `idCliente` pasó de `Long` a `String` (`sub` del JWT). `auth-ms` queda como legado. |
 | S8 | Mensajería asíncrona entre servicios desacoplados. | `orden-ms` publica `orden.creada` en el topic `orden-eventos`. `pago-ms` lo consume y registra el pago. `pago-ms` publica `pago.validado` / `pago.fallido` en `pago-eventos`. `orden-ms` lo consume y cambia el estado. No hay llamada REST orden→pago para ese flujo. DLT: `orden-eventos.DLT`, `pago-eventos.DLT`. |
-| S9 | Consistencia eventual, compensación e idempotencia. | SAGA coreografiada: orden nace `PENDIENTE_PAGO`; pago `PROCESADO` → `PAGADA`; pago `RECHAZADO` o timeout → `CANCELADA`. Outbox en la misma transacción. Idempotencia: un segundo `orden.creada` no duplica el `Pago`; un evento tardío no cancela una orden ya `PAGADA`. Efectivo no se auto-aprueba: un `ADMIN` confirma el cobro. |
+| S9 | Consistencia eventual, compensación e idempotencia. | SAGA coreografiada: orden nace `PENDIENTE_PAGO`; pago `PROCESADO` → `PAGADA`; pago `RECHAZADO` o timeout → `CANCELADA`. Outbox en la misma transacción. Idempotencia: un segundo `orden.creada` no duplica el `Pago`; un evento tardío no cancela una orden ya `PAGADA`. Efectivo no se auto-aprueba: el `CAJA` confirma el cobro en mostrador (sin depender de administración). |
 | S10 | Observabilidad operacional: logs, health, métricas y paneles. | Carpeta `obs/` como en pagatu: Prometheus `:19090` (descubre por Eureka + target estático de Keycloak), Loki `:13100`, Promtail, Grafana `:13000` (`admin`/`admin`). Health groups liveness/readiness. `FeignTraceConfig` propaga `X-Trace-ID` orden→catálogo. |
 | S11 | Integración con cliente frontend mediante el Gateway. | Angular 19 en `:4200`. Todas las llamadas van a `http://localhost:18080`. Login Authorization Code + PKCE (`keycloak-js`, client `qhalimenu-frontend`). Token en memoria (no `localStorage`). Catálogo público; ordenar y “Mis órdenes” exigen rol `CLIENTE`; confirmar efectivo exige `ADMIN`. |
 | S12 (esta evaluación) | Ensambla todo lo anterior y lo sustenta. | Este documento + demo en vivo (sección 4) + diapositivas de alcance, arquitectura y asignación. |
@@ -110,7 +110,7 @@ Estados de la orden: `PENDIENTE_PAGO` → `PAGADA` | `CANCELADA`.
 - **Idempotencia:** `PagoService.registrarPagoDesdeOrden` ignora un segundo evento con el mismo `ordenId`. `OrdenService.aplicarResultadoPago` ignora eventos si la orden ya es terminal.
 - **Compensación:** `pago.fallido` o reconciliador (15 min) pasan la orden a `CANCELADA`.
 - **Outbox:** el evento se guarda en la misma transacción que el agregado; `OutboxPublisher` lo envía a Kafka cada 2 s.
-- **Efectivo:** el pago queda `PENDIENTE` hasta `POST /api/v1/pagos/{id}/confirmar` (solo `ADMIN`).
+- **Efectivo:** el pago queda `PENDIENTE` y la orden aparece en la cola de Caja con código QR; el `CAJA` lo confirma con `POST /api/v1/pagos/orden/{ordenId}/confirmar-efectivo` (también puede hacerlo un `ADMIN`). La entrega solo se habilita tras el cobro.
 
 Demo de idempotencia: reenviar el mismo JSON de `orden.creada` (o dejar que Kafka reintente); debe existir un solo `Pago` para esa orden.
 
@@ -133,11 +133,11 @@ El tablero no viene precargado (en pagatu también se arma a mano en S10, Tabla 
 - App: `clients/qhalimenu-frontend` (Angular 19), `ng serve` → `:4200`.
 - API: interceptor Bearer hacia `http://localhost:18080/api/v1/...` únicamente.
 - Auth: `KeycloakService` — `onLoad: check-sso`, `pkceMethod: S256`. Token en el objeto Keycloak (memoria).
-- Flujo: catálogo público → login → Ordenar (efectivo o tarjeta simulada) → Mis órdenes (polling 5 s). Un `ADMIN` confirma pagos en efectivo.
+- Flujo: catálogo público → login → Ordenar (efectivo o tarjeta simulada) → Mis órdenes (polling 5 s). El módulo de **Caja** muestra el efectivo por cobrar con QR y registra el cobro; luego habilita la entrega.
 
 ### 4.7 Decisión propia distinta a `pagatu`
 
-1. **Dos métodos de pago de negocio:** `EFECTIVO` (caja, confirma `ADMIN`) y `TARJETA` (simulación MercadoPago). `pagatu` se centra en la pasarela.
+1. **Dos métodos de pago de negocio:** `EFECTIVO` (caja, confirma el propio `CAJA` sin pasar por administración) y `TARJETA` (simulación MercadoPago). `pagatu` se centra en la pasarela.
 2. **Outbox + reconciliador** encima de la SAGA coreografiada, para no perder eventos si Kafka está caído.
 3. **`idCliente` = `sub` de Keycloak (UUID String)** en órdenes, en lugar de un Long de tabla propia. `cliente-ms` (compra exprés de U1) queda como ficha auxiliar.
 

@@ -179,7 +179,8 @@
     <strong>Flujo de confirmación:</strong> confirmar un pago lo marca como <strong>PROCESADO</strong>.
     El servicio de pagos publica un evento y el servicio de órdenes actualiza la reserva de forma
     asíncrona con Kafka. Por eso la orden puede tardar unos segundos en figurar como pagada.
-    Los pagos con tarjeta y billeteras se confirman desde el flujo del cliente; el efectivo requiere
-    esta confirmación manual.
+    Los pagos con tarjeta y billeteras se confirman desde el flujo del cliente. El efectivo
+    normalmente lo cobra y confirma <strong>Caja</strong> desde el módulo de caja; administración
+    también puede confirmarlo si hace falta.
   </div>
 }

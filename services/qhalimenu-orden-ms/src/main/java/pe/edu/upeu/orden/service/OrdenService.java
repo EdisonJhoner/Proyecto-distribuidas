@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -39,6 +40,7 @@ public class OrdenService {
     public static final String ESTADO_PAGADA = "PAGADA";
     public static final String ESTADO_ENTREGADA = "ENTREGADA";
     public static final String ESTADO_CANCELADA = "CANCELADA";
+    public static final String METODO_EFECTIVO = "EFECTIVO";
 
     private static final String ALFABETO_CODIGO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -68,7 +70,10 @@ public class OrdenService {
 
     @Transactional(readOnly = true)
     public List<OrdenResponse> listarPendientesRecojo() {
-        return ordenRepository.findByEstadoConDetalles(ESTADO_PAGADA).stream()
+        List<Orden> efectivoPorCobrar = ordenRepository
+                .findByEstadoYMetodoPagoConDetalles(ESTADO_PENDIENTE_PAGO, METODO_EFECTIVO);
+        List<Orden> pagadas = ordenRepository.findByEstadoConDetalles(ESTADO_PAGADA);
+        return Stream.concat(efectivoPorCobrar.stream(), pagadas.stream())
                 .map(ordenMapper::toResponse)
                 .toList();
     }
@@ -105,6 +110,7 @@ public class OrdenService {
                 .idCliente(idCliente)
                 .fechaCreacion(LocalDateTime.now())
                 .estado(ESTADO_PENDIENTE_PAGO)
+                .codigoRecojo(generarCodigoRecojo())
                 .tipoComprobante(request.getTipoComprobante())
                 .metodoPago(request.getMetodoPago())
                 .momentoPago(request.getMomentoPago())

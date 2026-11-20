@@ -66,6 +66,11 @@ public class PagoController {
         return pagoService.confirmarPago(id);
     }
 
+    @PostMapping("/orden/{ordenId}/confirmar-efectivo")
+    public PagoResponse confirmarEfectivo(@PathVariable Long ordenId) {
+        return pagoService.confirmarEfectivoPorOrden(ordenId);
+    }
+
     @PostMapping("/orden/{ordenId}/confirmar-billetera")
     public PagoResponse confirmarBilletera(@PathVariable Long ordenId) {
         return pagoService.confirmarBilletera(ordenId);

@@ -10,9 +10,11 @@ import {
   signal
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { Orden } from '../../models/orden.models';
 import { ConfirmService } from '../../services/confirm.service';
 import { OrdenesService } from '../../services/ordenes.service';
+import { PagosService } from '../../services/pagos.service';
 import { ToastService } from '../../services/toast.service';
 import { mensajeHttp } from '../../shared/api-error';
 import { EstadoBadgeComponent } from '../../shared/estado-badge/estado-badge.component';
@@ -45,6 +47,7 @@ export class CajaComponent implements OnInit, OnDestroy {
   @ViewChild('video') video?: ElementRef<HTMLVideoElement>;
 
   private readonly ordenes = inject(OrdenesService);
+  private readonly pagos = inject(PagosService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
 
@@ -54,6 +57,7 @@ export class CajaComponent implements OnInit, OnDestroy {
   readonly buscando = signal(false);
   readonly cargandoPendientes = signal(true);
   readonly actuando = signal<'entregar' | 'cancelar' | null>(null);
+  readonly cobrando = signal(false);
   readonly error = signal('');
   readonly avisoCamara = signal('');
   readonly escaneando = signal(false);
@@ -62,6 +66,11 @@ export class CajaComponent implements OnInit, OnDestroy {
   readonly montoPendiente = computed(() =>
     this.pendientes().reduce((total, orden) => total + Number(orden.total || 0), 0));
   readonly puedeEntregar = computed(() => this.orden()?.estado === 'PAGADA');
+  readonly esEfectivoPendiente = computed(() => {
+    const orden = this.orden();
+    return orden?.estado === 'PENDIENTE_PAGO'
+      && String(orden.metodoPago).toUpperCase() === 'EFECTIVO';
+  });
   readonly puedeCancelar = computed(() => {
     const estado = this.orden()?.estado;
     return estado === 'PAGADA' || estado === 'PENDIENTE_PAGO';
@@ -119,7 +128,7 @@ export class CajaComponent implements OnInit, OnDestroy {
         this.codigo.set(orden.codigoRecojo ?? codigo);
         this.buscando.set(false);
         if (orden.estado === 'PENDIENTE_PAGO') {
-          this.toast.warning('Pago pendiente', 'Confirma el cobro en el módulo de pagos antes de entregar.');
+          this.toast.warning('Pago pendiente', 'Cobra el efectivo aquí antes de entregar la reserva.');
         }
       },
       error: error => {
@@ -128,6 +137,55 @@ export class CajaComponent implements OnInit, OnDestroy {
         this.error.set(mensajeHttp(error, 'No se encontró una orden con ese código de recojo.'));
       }
     });
+  }
+
+  async cobrarEfectivo(): Promise<void> {
+    const orden = this.orden();
+    if (!orden || this.cobrando()) {
+      return;
+    }
+    const confirmado = await this.confirm.confirmar({
+      titulo: '¿Cobrar en efectivo?',
+      mensaje: `Confirma que recibiste S/ ${Number(orden.total).toFixed(2)} por la orden #${orden.id}. La reserva pasará a pagada y podrás entregarla.`,
+      confirmar: 'Sí, cobrar',
+      cancelar: 'Volver'
+    });
+    if (!confirmado) {
+      return;
+    }
+
+    this.cobrando.set(true);
+    this.error.set('');
+    try {
+      await firstValueFrom(this.pagos.confirmarEfectivo(orden.id));
+      const actualizada = await this.esperarOrdenPagada(orden.id);
+      if (actualizada) {
+        this.orden.set(actualizada);
+        this.toast.success('Cobro registrado', `Orden #${orden.id} pagada en efectivo. Ya puedes entregarla.`);
+      } else {
+        this.toast.info('Cobro registrado', 'La orden se actualizará en unos segundos. Actualiza la cola.');
+      }
+      this.cargarPendientes();
+    } catch (error) {
+      this.error.set(mensajeHttp(error, 'No se pudo registrar el cobro en efectivo.'));
+    } finally {
+      this.cobrando.set(false);
+    }
+  }
+
+  private async esperarOrdenPagada(ordenId: number): Promise<Orden | null> {
+    for (let intento = 0; intento < 12; intento += 1) {
+      await new Promise<void>(resolver => setTimeout(resolver, 500));
+      try {
+        const actual = await firstValueFrom(this.ordenes.obtener(ordenId));
+        if (actual.estado === 'PAGADA' || actual.estado === 'ENTREGADA') {
+          return actual;
+        }
+      } catch {
+        // El evento Kafka puede tardar; se reintenta sin interrumpir el cobro.
+      }
+    }
+    return null;
   }
 
   async entregar(): Promise<void> {

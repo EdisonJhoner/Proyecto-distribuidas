@@ -30,7 +30,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -85,6 +87,40 @@ class OrdenServiceTest {
         verify(ordenEventoPublisher).publicarOrdenCreada(any(Orden.class));
         verify(catalogoResiliente).descontarStock(10L, 2);
         verify(catalogoResiliente).descontarStock(11L, 1);
+    }
+
+    @Test
+    void generaCodigoDeRecojoDesdeLaCreacionParaQueElEfectivoAparezcaEnCaja() {
+        when(currentUserProvider.getIdCliente()).thenReturn(1L);
+        when(clienteResiliente.validarCliente(1L))
+                .thenReturn(new ClienteDto(1L, "12345678", "Ana Perez"));
+        when(catalogoResiliente.obtenerProducto(10L))
+                .thenReturn(new CatalogoProductoDto(10L, "Menu del dia", new BigDecimal("8.50"), true, 50));
+        when(catalogoResiliente.obtenerProducto(11L))
+                .thenReturn(new CatalogoProductoDto(11L, "Jugo", new BigDecimal("3.00"), true, 50));
+
+        OrdenResponse response = ordenService.crear(requestConDosDetalles(), "1");
+
+        assertNotNull(response.getCodigoRecojo());
+        assertTrue(response.getCodigoRecojo().startsWith("QM"));
+    }
+
+    @Test
+    void laColaDeCajaIncluyeEfectivoPendienteDeCobro() {
+        Orden efectivoPendiente = Orden.builder()
+                .id(1L).estado("PENDIENTE_PAGO").metodoPago("EFECTIVO").build();
+        Orden pagada = Orden.builder()
+                .id(2L).estado("PAGADA").metodoPago("TARJETA").build();
+        when(ordenRepository.findByEstadoYMetodoPagoConDetalles("PENDIENTE_PAGO", "EFECTIVO"))
+                .thenReturn(List.of(efectivoPendiente));
+        when(ordenRepository.findByEstadoConDetalles("PAGADA"))
+                .thenReturn(List.of(pagada));
+
+        List<OrdenResponse> cola = ordenService.listarPendientesRecojo();
+
+        assertEquals(2, cola.size());
+        assertEquals(1L, cola.get(0).getId());
+        assertEquals("PENDIENTE_PAGO", cola.get(0).getEstado());
     }
 
     @Test

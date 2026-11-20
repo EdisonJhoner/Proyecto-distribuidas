@@ -40,7 +40,9 @@ public class PagoSecurityConfig {
                         .hasAnyRole("CLIENTE", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/pagos/orden/*/confirmar-billetera")
                         .hasAnyRole("CLIENTE", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/pagos/*/confirmar").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/pagos/*/confirmar").hasAnyRole("ADMIN", "CAJA")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/pagos/orden/*/confirmar-efectivo")
+                        .hasAnyRole("ADMIN", "CAJA")
                         .requestMatchers(HttpMethod.GET, "/api/v1/pagos/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2

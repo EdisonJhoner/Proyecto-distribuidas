@@ -41,7 +41,7 @@ Al pulsar **Ordenar** en el catálogo se abre un modal para elegir cómo pagar:
 
 | Método | Comportamiento |
 |---|---|
-| **Efectivo** | Crea la orden y el pago queda `PENDIENTE`; la orden queda `PENDIENTE_PAGO` hasta que un `ADMIN` confirme el cobro. |
+| **Efectivo** | Crea la orden con código QR y el pago queda `PENDIENTE`; la orden aparece en la cola de **Caja** como "por cobrar" y el `CAJA` confirma el cobro (o un `ADMIN` si hace falta). |
 | **Tarjeta** | Pide número (16 dígitos), titular, vencimiento `MM/AA` y CVV; crea la orden y procesa el pago (simulado si no hay token real de MercadoPago). La orden pasa a `PAGADA`. |
 
 Reglas del flujo:
@@ -54,10 +54,11 @@ Reglas del flujo:
    (idempotente por `ordenId`, no duplica pagos) y confirma la simulación con
    `GET /api/v1/pagos/simulacion/{preferenceId}`.
 4. Kafka `pago-eventos` -> `qhalimenu-orden-ms` cambia la orden a `PAGADA`.
-5. Un `ADMIN` confirma el efectivo con
-   `POST /api/v1/pagos/{pagoId}/confirmar` desde **Mis órdenes -> Pagos en
-   efectivo pendientes** (o por API). Esto publica `pago.validado` y la orden
-   pasa a `PAGADA`.
+5. El `CAJA` confirma el efectivo desde **Caja -> Cobrar efectivo**, mediante
+   `POST /api/v1/pagos/orden/{ordenId}/confirmar-efectivo` (también existe
+   `POST /api/v1/pagos/{pagoId}/confirmar` para `ADMIN`/`CAJA`). Esto publica
+   `pago.validado` y la orden pasa a `PAGADA`, habilitando la entrega. No se
+   requiere intervención de administración.
 
 Los datos de tarjeta se validan en el navegador y **no se envían al backend**;
 el pago es una simulación de demostración.
@@ -71,7 +72,7 @@ el pago es una simulación de demostración.
 5. Kafka `orden-eventos` -> `qhalimenu-pago-ms` registra el pago con el método elegido.
 6. Tarjeta: `crear-preferencia` + confirmación de simulación -> `pago.validado`.
 7. Kafka `pago-eventos` -> `qhalimenu-orden-ms` cambia la orden a `PAGADA`.
-8. Efectivo: el pago queda `PENDIENTE`; el `ADMIN` lo confirma y entonces la orden pasa a `PAGADA`.
+8. Efectivo: el pago queda `PENDIENTE`, la orden aparece en Caja con su QR; el `CAJA` cobra y confirma y entonces la orden pasa a `PAGADA`.
 9. `GET /api/v1/ordenes/mis-ordenes` muestra estado, método de pago y total.
 10. Logout contra Keycloak y regreso a la pantalla pública.
 

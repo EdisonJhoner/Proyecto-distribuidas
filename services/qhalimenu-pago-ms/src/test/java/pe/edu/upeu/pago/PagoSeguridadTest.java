@@ -71,6 +71,13 @@ class PagoSeguridadTest {
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
+    private static RequestPostProcessor cajaToken() {
+        return jwt().jwt(builder -> builder
+                .subject("caja1")
+                .claim("roles", List.of("CAJA")))
+                .authorities(new SimpleGrantedAuthority("ROLE_CAJA"));
+    }
+
     @Test
     void listarPagosSinTokenSeRechazaCon401() throws Exception {
         mockMvc.perform(get("/api/v1/pagos"))
@@ -115,22 +122,55 @@ class PagoSeguridadTest {
     }
 
     @Test
-    void confirmarEfectivoEsExclusivoDeAdmin() throws Exception {
-        Pago pago = pagoRepository.save(Pago.builder()
+    void confirmarEfectivoLoPuedenCajaYAdmin() throws Exception {
+        Pago pagoCaja = pagoRepository.save(Pago.builder()
                 .ordenId(999L)
                 .monto(new BigDecimal("15.00"))
                 .metodoPago("EFECTIVO")
                 .estadoPago("PENDIENTE")
                 .fechaPago(LocalDateTime.now())
                 .build());
+        Pago pagoAdmin = pagoRepository.save(Pago.builder()
+                .ordenId(998L)
+                .monto(new BigDecimal("16.00"))
+                .metodoPago("EFECTIVO")
+                .estadoPago("PENDIENTE")
+                .fechaPago(LocalDateTime.now())
+                .build());
 
-        mockMvc.perform(post("/api/v1/pagos/" + pago.getId() + "/confirmar")
+        mockMvc.perform(post("/api/v1/pagos/" + pagoCaja.getId() + "/confirmar")
                         .with(clienteToken()))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/v1/pagos/" + pago.getId() + "/confirmar")
+        mockMvc.perform(post("/api/v1/pagos/" + pagoCaja.getId() + "/confirmar")
+                        .with(cajaToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPago").value("PROCESADO"));
+
+        mockMvc.perform(post("/api/v1/pagos/" + pagoAdmin.getId() + "/confirmar")
                         .with(adminToken()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPago").value("PROCESADO"));
+    }
+
+    @Test
+    void cajaPuedeConfirmarEfectivoPorNumeroDeOrden() throws Exception {
+        Pago pago = pagoRepository.save(Pago.builder()
+                .ordenId(997L)
+                .monto(new BigDecimal("17.00"))
+                .metodoPago("EFECTIVO")
+                .estadoPago("PENDIENTE")
+                .fechaPago(LocalDateTime.now())
+                .build());
+
+        mockMvc.perform(post("/api/v1/pagos/orden/" + pago.getOrdenId() + "/confirmar-efectivo")
+                        .with(clienteToken()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/pagos/orden/" + pago.getOrdenId() + "/confirmar-efectivo")
+                        .with(cajaToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ordenId").value(997L))
                 .andExpect(jsonPath("$.estadoPago").value("PROCESADO"));
     }
 

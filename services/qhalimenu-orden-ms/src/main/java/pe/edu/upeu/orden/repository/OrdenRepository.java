@@ -32,5 +32,11 @@ public interface OrdenRepository extends JpaRepository<Orden, Long> {
     @Query("SELECT DISTINCT o FROM Orden o LEFT JOIN FETCH o.detalles WHERE o.estado = :estado ORDER BY o.fechaPago ASC, o.fechaCreacion ASC")
     List<Orden> findByEstadoConDetalles(@Param("estado") String estado);
 
+    @Query("SELECT DISTINCT o FROM Orden o LEFT JOIN FETCH o.detalles "
+            + "WHERE o.estado = :estado AND UPPER(o.metodoPago) = UPPER(:metodoPago) "
+            + "ORDER BY o.fechaCreacion ASC")
+    List<Orden> findByEstadoYMetodoPagoConDetalles(
+            @Param("estado") String estado, @Param("metodoPago") String metodoPago);
+
     boolean existsByCodigoRecojo(String codigoRecojo);
 }
