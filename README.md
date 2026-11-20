@@ -4,6 +4,8 @@ Sistema distribuido de reserva anticipada de almuerzos. Identidad oficial: **Qha
 
 Producto de Unidad I: [docs/u1-producto.md](docs/u1-producto.md).
 
+Producto de Unidad II (S12): [docs/u2-producto.md](docs/u2-producto.md).
+
 Sesiones 6-9 (comunicación resiliente, seguridad JWT, Kafka, SAGA coreografiada): [docs/sesiones-06-09/](docs/sesiones-06-09/README.md).
 
 ## Componentes
@@ -19,6 +21,8 @@ Sesiones 6-9 (comunicación resiliente, seguridad JWT, Kafka, SAGA coreografiada
 | `qhalimenu-pago-ms` | `services/qhalimenu-pago-ms` | Pagos de órdenes | `8086` / `8087` |
 
 Configuración centralizada: `infra/qhalimenu-config/config-repo/`.
+
+Tema de acceso (login) de Keycloak: [`keycloak/themes/qhalimenu`](keycloak/themes/qhalimenu/README.md).
 
 Bases de datos DEV: `qhalimenu_catalogo_db` (`15432`), `qhalimenu_orden_db` (`15434`), `qhalimenu_cliente_db` (`15436`) y `qhalimenu_pago_db` (`15438`). Usuario: `qhalimenu`.
 
@@ -60,6 +64,19 @@ La forma más sencilla de levantar todo (bases de datos + 7 servicios) es:
    | Swagger | <http://localhost:8080/swagger-ui.html> → 8082, 8084, 8086 |
 
 > **Posible conflicto de puertos:** los contenedores `pagatu-*` que ya existan en la misma máquina ocupan los puertos `15432` (y otros). Si `docker compose up -d` falla, libera esos puertos o detén esos contenedores antes de levantar las bases de QhaliMenu.
+
+### Arranque tolerante a fallos
+
+Los módulos que consumen Config Server (`eureka`, `gateway`, `catalogo`, `orden`, `cliente`, `pago`, `auth`) tienen:
+
+- `spring.config.import: "configserver:..."` **obligatorio** (sin prefijo `optional:`).
+- `spring.cloud.config.fail-fast: true`, que es lo que habilita el reintento.
+- `spring-retry` en el `pom.xml` y `spring.cloud.config.retry.*` en `application.yml`: 15 intentos con backoff de 1 s a 5 s (≈60 s de ventana).
+- `spring.devtools.restart.enabled: false`, para que un rebuild del IDE no reinicie el servicio en caliente y tumbe la cadena de arranque.
+
+Si el Config Server aún no está listo, el servicio **espera y reintenta** en vez de morir con `Failed to configure a DataSource`. Si sigue caído al agotar los intentos, falla con un error explícito de Config Server (mejor diagnóstico que un `datasource.url` ausente).
+
+Para volver al comportamiento anterior: quitar `spring-retry` del `pom.xml`, borrar `spring.cloud.config.fail-fast` y el bloque `spring.cloud.config.retry`, restaurar `optional:configserver:` en `spring.config.import` y poner `spring.devtools.restart.enabled: true` (también en los `*-dev.yml` del `config-repo`).
 
 ## Ejecución DEV
 

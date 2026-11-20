@@ -1,0 +1,53 @@
+name: qhalimenu-obs-dev
+
+services:
+  qhalimenu-prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: qhalimenu-prometheus-dev
+    restart: unless-stopped
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./prometheus/prometheus-dev.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  qhalimenu-loki:
+    image: grafana/loki:3.7.6
+    container_name: qhalimenu-loki-dev
+    restart: unless-stopped
+    ports:
+      - "13100:3100"
+
+  qhalimenu-promtail:
+    image: grafana/promtail:3.6.8
+    container_name: qhalimenu-promtail-dev
+    restart: unless-stopped
+    volumes:
+      - ./promtail/promtail-config-dev.yml:/etc/promtail/config.yml:ro
+      - ../services/qhalimenu-catalogo-ms/logs:/var/log/qhalimenu-catalogo-ms:ro
+      - ../services/qhalimenu-orden-ms/logs:/var/log/qhalimenu-orden-ms:ro
+      - ../services/qhalimenu-cliente-ms/logs:/var/log/qhalimenu-cliente-ms:ro
+      - ../services/qhalimenu-auth-ms/logs:/var/log/qhalimenu-auth-ms:ro
+      - ../services/qhalimenu-pago-ms/logs:/var/log/qhalimenu-pago-ms:ro
+      - ../keycloak/logs:/var/log/qhalimenu-keycloak:ro
+      - ../infra/qhalimenu-gateway/logs:/var/log/qhalimenu-gateway:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - qhalimenu-loki
+
+  qhalimenu-grafana:
+    image: grafana/grafana:11.4.0
+    container_name: qhalimenu-grafana-dev
+    restart: unless-stopped
+    ports:
+      - "13000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_DEFAULT_THEME=dark
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/json/qhalimenu-observabilidad.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - qhalimenu-prometheus
+      - qhalimenu-loki

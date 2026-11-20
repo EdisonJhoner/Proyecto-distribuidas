@@ -42,6 +42,18 @@ public class Orden {
     @Column(name = "total", nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
 
+    @Column(name = "codigo_recojo", length = 20, unique = true)
+    private String codigoRecojo;
+
+    @Column(name = "nombre_cliente", length = 120)
+    private String nombreCliente;
+
+    @Column(name = "fecha_pago")
+    private LocalDateTime fechaPago;
+
+    @Column(name = "fecha_entrega")
+    private LocalDateTime fechaEntrega;
+
     @OneToMany(mappedBy = "orden", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrdenDetalle> detalles = new ArrayList<>();

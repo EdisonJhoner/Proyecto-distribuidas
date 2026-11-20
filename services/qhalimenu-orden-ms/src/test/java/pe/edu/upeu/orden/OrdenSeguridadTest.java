@@ -6,8 +6,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -23,10 +21,10 @@ import pe.edu.upeu.orden.repository.OrdenRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -87,6 +85,13 @@ class OrdenSeguridadTest {
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
+    private static RequestPostProcessor cajaToken() {
+        return jwt().jwt(builder -> builder
+                .subject("caja1")
+                .claim("roles", List.of("CAJA")))
+                .authorities(new SimpleGrantedAuthority("ROLE_CAJA"));
+    }
+
     @Test
     void sinTokenSeRechazaCon401() throws Exception {
         mockMvc.perform(get("/api/v1/ordenes"))
@@ -100,6 +105,22 @@ class OrdenSeguridadTest {
 
         mockMvc.perform(get("/api/v1/ordenes").with(adminToken()))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/ordenes").with(cajaToken()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void entregarEsExclusivoDeCajaYAdmin() throws Exception {
+        String body = """
+                { "codigo": "QMABC123" }
+                """;
+
+        mockMvc.perform(post("/api/v1/ordenes/entregar")
+                        .with(clienteToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -126,7 +147,7 @@ class OrdenSeguridadTest {
     void creacionDeOrdenUsaIdClienteDelTokenValidado() throws Exception {
         when(clienteClient.obtener(1L)).thenReturn(new ClienteDto(1L, "12345678", "Ana Perez"));
         when(catalogoClient.obtener(10L)).thenReturn(
-                new CatalogoProductoDto(10L, "Menu del dia", new BigDecimal("8.50"), true));
+                new CatalogoProductoDto(10L, "Menu del dia", new BigDecimal("8.50"), true, 50));
 
         String body = """
                 {
@@ -144,6 +165,25 @@ class OrdenSeguridadTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.idCliente").value("1"));
+    }
+
+    @Test
+    void eliminarOrdenEsExclusivoDeAdmin() throws Exception {
+        Orden orden = ordenRepository.save(Orden.builder()
+                .idCliente("1")
+                .fechaCreacion(LocalDateTime.now())
+                .estado("CANCELADA")
+                .tipoComprobante("BOLETA")
+                .metodoPago("TARJETA")
+                .momentoPago("ANTICIPADO")
+                .total(new BigDecimal("10.00"))
+                .build());
+
+        mockMvc.perform(delete("/api/v1/ordenes/" + orden.getId()).with(clienteToken()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/v1/ordenes/" + orden.getId()).with(adminToken()))
+                .andExpect(status().isNoContent());
     }
 
     @Test

@@ -1,0 +1,249 @@
+<div class="page">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Ruta de navegación">
+      <a routerLink="/">Inicio</a>
+      <app-icon name="chevron-right" [size]="13" />
+      <a routerLink="/catalogo">Menú de hoy</a>
+      <app-icon name="chevron-right" [size]="13" />
+      <span>Carrito</span>
+    </nav>
+
+    <div class="page-head">
+      <div>
+        <span class="eyebrow">Paso final</span>
+        <h1>Carrito y pago</h1>
+        <p>Revisa tu pedido, elige cómo pagar y confirma tu reserva del día.</p>
+      </div>
+      <a class="btn btn-ghost" routerLink="/catalogo">
+        <app-icon name="arrow-left" [size]="16" /> Seguir eligiendo
+      </a>
+    </div>
+
+    @if (aviso()) {
+      <div class="alert alert-warning" style="margin-bottom: 1rem;">
+        <app-icon name="info" [size]="18" />
+        <span>{{ aviso() }}</span>
+      </div>
+    }
+
+    @if (carrito.vacio()) {
+      <div class="empty-state">
+        <span class="empty-state__icon"><app-icon name="bag" [size]="28" /></span>
+        <h3>Tu carrito está vacío</h3>
+        <p>Agrega platos del menú de hoy para reservar tu almuerzo.</p>
+        <a class="btn btn-primary" routerLink="/catalogo">
+          <app-icon name="utensils" [size]="17" /> Explorar el menú
+        </a>
+      </div>
+    } @else {
+      <div class="checkout-grid">
+        <div style="display: grid; gap: 1rem;">
+          <section class="panel">
+            <div class="panel__head">
+              <h2 style="font-size: 1.35rem;">Tu pedido</h2>
+              <span class="results-count">{{ carrito.totalUnidades() }} {{ carrito.totalUnidades() === 1 ? 'unidad' : 'unidades' }}</span>
+            </div>
+
+            @if (validando()) {
+              <div class="loading-block" style="padding: 1rem;">
+                <span class="spinner"></span>
+                <span>Verificando stock y precios…</span>
+              </div>
+            }
+
+            <div class="cart-list">
+              @for (item of carrito.items(); track item.id) {
+                <article class="cart-item">
+                  <div class="cart-item__img">
+                    <img
+                      [src]="item.imagen || 'img/mesa.jpg'"
+                      [alt]="'Plato ' + item.nombre"
+                      (error)="alFallarImagen($event)">
+                  </div>
+                  <div class="cart-item__body">
+                    <h3>{{ item.nombre }}</h3>
+                    <p>
+                      S/ {{ item.precio | number:'1.2-2' }} c/u
+                      @if (item.categoria) { · {{ item.categoria }} }
+                    </p>
+                    <div class="cart-item__actions" style="margin-top: 0.45rem;">
+                      <div class="qty-control">
+                        <button type="button" (click)="menos(item)" [disabled]="item.cantidad <= 1" aria-label="Quitar una unidad">
+                          <app-icon name="minus" [size]="15" />
+                        </button>
+                        <span>{{ item.cantidad }}</span>
+                        <button type="button" (click)="mas(item)" [disabled]="item.cantidad >= item.stock" aria-label="Agregar una unidad">
+                          <app-icon name="plus" [size]="15" />
+                        </button>
+                      </div>
+                      <button type="button" class="btn-link" (click)="quitar(item)" style="color: var(--qm-danger);">
+                        <app-icon name="trash" [size]="14" /> Quitar
+                      </button>
+                    </div>
+                  </div>
+                  <div class="cart-item__subtotal">
+                    S/ {{ item.precio * item.cantidad | number:'1.2-2' }}
+                    <div class="tiny muted" style="font-family: var(--qm-font-body); font-size: 0.7rem;">Máx. {{ item.stock }}</div>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__head">
+              <h2 style="font-size: 1.35rem;">Datos de la reserva</h2>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-row">
+                <label class="field">
+                  <span>Nombre de quien recoge</span>
+                  <input
+                    class="input"
+                    type="text"
+                    [value]="nombreCliente()"
+                    (input)="cambiarNombre($event)"
+                    maxlength="120"
+                    placeholder="Nombre y apellido"
+                    autocomplete="name">
+                </label>
+                <label class="field">
+                  <span>Comprobante</span>
+                  <select class="select" [value]="tipoComprobante()" (change)="cambiarComprobante($event)">
+                    <option value="BOLETA">Boleta</option>
+                    <option value="FACTURA">Factura</option>
+                  </select>
+                  <small>El comprobante se emite con los datos de tu cuenta.</small>
+                </label>
+              </div>
+
+              <div class="note">
+                <app-icon name="calendar" [size]="15" style="vertical-align: -2px;" />
+                Tu reserva corresponde al <strong>servicio de hoy</strong>. El recojo se realiza en caja
+                presentando el código QR de tu boleta digital.
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__head">
+              <h2 style="font-size: 1.35rem;">Método de pago</h2>
+              <span class="status-badge is-neutral"><app-icon name="lock" [size]="13" /> Pago seguro</span>
+            </div>
+
+            <div class="pay-methods">
+              @for (opcion of metodos; track opcion.valor) {
+                <label class="pay-method" [class.is-active]="metodo() === opcion.valor">
+                  <input
+                    type="radio"
+                    name="metodoPago"
+                    [value]="opcion.valor"
+                    [checked]="metodo() === opcion.valor"
+                    (change)="elegirMetodo(opcion.valor)">
+                  <app-icon [name]="opcion.icono" [size]="20" />
+                  <span>
+                    {{ opcion.etiqueta }}
+                    <small>{{ opcion.detalle }}</small>
+                  </span>
+                </label>
+              }
+            </div>
+
+            @if (esBilletera()) {
+              <div class="qr-box" style="margin-top: 1rem;">
+                <img [src]="qrDemo()" [alt]="'QR demostrativo de cobro ' + metodo()">
+                <strong style="font-size: 0.86rem;">QR de cobro demostrativo</strong>
+                <p class="tiny muted mb-0">
+                  Este código no realiza cargos reales. Al continuar, el sistema simula
+                  la confirmación de tu transferencia {{ metodo() }}.
+                </p>
+              </div>
+            }
+
+            @if (esEfectivo()) {
+              <div class="alert alert-warning" style="margin-top: 1rem;">
+                <app-icon name="cash" [size]="18" />
+                <span>
+                  Tu pedido queda <strong>reservado</strong>. Paga en caja para que el
+                  administrador confirme el cobro; recién entonces podrás recogerlo.
+                </span>
+              </div>
+            }
+
+            @if (metodo() === 'TARJETA') {
+              <div class="note" style="margin-top: 1rem;">
+                <app-icon name="card" [size]="15" style="vertical-align: -2px;" />
+                Serás atendido por la pasarela de pago. En este entorno la pasarela
+                opera en <strong>modo simulación</strong> y no solicita datos reales de tarjeta.
+              </div>
+            }
+          </section>
+        </div>
+
+        <aside class="summary">
+          <div class="panel" style="display: grid; gap: 0.9rem;">
+            <h2 style="font-size: 1.3rem; margin: 0;">Resumen</h2>
+
+            <div class="summary__row">
+              <span>Platos</span>
+              <strong>{{ carrito.distintas() }}</strong>
+            </div>
+            <div class="summary__row">
+              <span>Unidades</span>
+              <strong>{{ carrito.totalUnidades() }}</strong>
+            </div>
+            <div class="summary__row">
+              <span>Servicio de mesa</span>
+              <strong>Recojo en caja</strong>
+            </div>
+
+            <div class="summary__total">
+              <span>Total a pagar</span>
+              <strong>S/ {{ carrito.totalMonto() | number:'1.2-2' }}</strong>
+            </div>
+
+            @if (error()) {
+              <div class="alert alert-error">
+                <app-icon name="alert" [size]="17" />
+                <span>{{ error() }}</span>
+              </div>
+            }
+
+            <button
+              type="button"
+              class="btn btn-primary btn-lg btn-block"
+              [disabled]="procesando() || validando()"
+              (click)="pagar()">
+              @if (procesando()) {
+                <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                Procesando pago…
+              } @else if (esEfectivo()) {
+                <app-icon name="check" [size]="18" /> Reservar y pagar en caja
+              } @else {
+                <app-icon name="lock" [size]="18" /> Confirmar reserva y pagar
+              }
+            </button>
+
+            <p class="tiny muted mb-0" style="text-align: center;">
+              Al confirmar aceptas que tu pedido se prepare para el servicio de hoy.
+              El stock se descuenta de inmediato.
+            </p>
+
+            <div class="note" style="display: grid; gap: 0.35rem;">
+              <span style="display: flex; align-items: center; gap: 0.4rem;">
+                <app-icon name="shield" [size]="15" /> Autenticación Keycloak
+              </span>
+              <span style="display: flex; align-items: center; gap: 0.4rem;">
+                <app-icon name="refresh" [size]="15" /> Tokens renovados automáticamente
+              </span>
+              <span style="display: flex; align-items: center; gap: 0.4rem;">
+                <app-icon name="qr" [size]="15" /> Boleta digital con QR de recojo
+              </span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    }
+  </div>
+</div>

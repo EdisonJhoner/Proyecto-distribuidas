@@ -29,15 +29,29 @@ public class OrdenSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/info", "/swagger-ui/**",
+                        .requestMatchers("/actuator/**", "/swagger-ui/**",
                                 "/swagger-ui.html", "/v3/api-docs/**")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/ordenes")
-                        .hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/ordenes/**")
+                        .hasAnyRole("ADMIN", "CAJA")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ordenes/mis-ordenes")
                         .hasAnyRole("CLIENTE", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ordenes/pendientes-recojo")
+                        .hasAnyRole("ADMIN", "CAJA")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ordenes/codigo/**")
+                        .hasAnyRole("ADMIN", "CAJA")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ordenes/**")
+                        .hasAnyRole("CLIENTE", "ADMIN", "CAJA")
                         .requestMatchers(HttpMethod.POST, "/api/v1/ordenes")
                         .hasAnyRole("CLIENTE", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/ordenes/entregar")
+                        .hasAnyRole("ADMIN", "CAJA")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/ordenes/cierre-dia")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/ordenes/*/cancelar")
+                        .hasAnyRole("ADMIN", "CAJA")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/ordenes/**")
+                        .hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));

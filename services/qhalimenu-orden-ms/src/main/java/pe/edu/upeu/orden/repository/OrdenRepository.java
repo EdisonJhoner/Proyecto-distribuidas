@@ -21,4 +21,16 @@ public interface OrdenRepository extends JpaRepository<Orden, Long> {
     List<Orden> findByIdClienteConDetalles(@Param("idCliente") String idCliente);
 
     List<Orden> findByEstadoAndFechaCreacionBefore(String estado, LocalDateTime limite);
+
+    @Query("SELECT DISTINCT o FROM Orden o LEFT JOIN FETCH o.detalles WHERE o.estado = :estado AND o.fechaCreacion < :limite")
+    List<Orden> findByEstadoAndFechaCreacionBeforeConDetalles(
+            @Param("estado") String estado, @Param("limite") LocalDateTime limite);
+
+    @Query("SELECT o FROM Orden o LEFT JOIN FETCH o.detalles WHERE UPPER(o.codigoRecojo) = UPPER(:codigo)")
+    Optional<Orden> findByCodigoRecojoIgnoreCase(@Param("codigo") String codigo);
+
+    @Query("SELECT DISTINCT o FROM Orden o LEFT JOIN FETCH o.detalles WHERE o.estado = :estado ORDER BY o.fechaPago ASC, o.fechaCreacion ASC")
+    List<Orden> findByEstadoConDetalles(@Param("estado") String estado);
+
+    boolean existsByCodigoRecojo(String codigoRecojo);
 }

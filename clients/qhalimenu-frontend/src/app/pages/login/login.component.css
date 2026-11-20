@@ -1,0 +1,13 @@
+:host { display: block; }
+
+code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  background: var(--qm-surface);
+  border: 1px solid var(--qm-line);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.auth-card h1 { margin: 0; }
+.auth-divider { margin-block: 0.2rem; }

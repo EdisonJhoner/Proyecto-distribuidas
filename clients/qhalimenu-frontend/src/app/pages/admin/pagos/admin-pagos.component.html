@@ -1,0 +1,185 @@
+<div class="admin-page-head">
+  <div>
+    <span class="eyebrow">Finanzas</span>
+    <h1>Control de pagos</h1>
+    <p>Supervisa los pagos registrados y confirma los cobros en efectivo de caja.</p>
+  </div>
+  <div class="toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" (click)="cargar()" [disabled]="cargando()">
+      <app-icon name="refresh" [size]="15" /> Actualizar
+    </button>
+    <a class="btn btn-outline btn-sm" routerLink="/admin/ordenes">
+      <app-icon name="package" [size]="15" /> Ver órdenes
+    </a>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="alert alert-error" style="margin-bottom: 1rem;">
+    <app-icon name="alert" [size]="18" />
+    <span>{{ error() }}</span>
+  </div>
+}
+
+@if (!cargando() && efectivoPendiente() > 0) {
+  <div class="alert alert-warning" style="margin-bottom: 1rem;">
+    <app-icon name="cash" [size]="18" />
+    <span>
+      Hay <strong>{{ efectivoPendiente() }}</strong> pago(s) en efectivo esperando confirmación.
+      Confírmalos para que la orden pase a <strong>PAGADA</strong> y el cliente pueda recoger.
+    </span>
+    <button type="button" class="btn btn-ghost btn-sm" style="margin-left: auto;" (click)="limpiarFiltros(); estado.set('PENDIENTE'); metodo.set('EFECTIVO')">
+      Ver efectivo pendiente
+    </button>
+  </div>
+}
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="card" [size]="19" /></span>
+    <span class="stat-card__label">Pagos registrados</span>
+    <span class="stat-card__value">{{ total() }}</span>
+    <span class="stat-card__hint">Incluye todos los estados</span>
+  </article>
+  <article class="stat-card stat-card--accent">
+    <span class="stat-card__icon"><app-icon name="chart" [size]="19" /></span>
+    <span class="stat-card__label">Monto procesado</span>
+    <span class="stat-card__value">S/ {{ montoProcesado() | number:'1.2-2' }}</span>
+    <span class="stat-card__hint">{{ procesados().length }} pagos confirmados</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="clock" [size]="19" /></span>
+    <span class="stat-card__label">Pendientes</span>
+    <span class="stat-card__value">{{ pendientes().length }}</span>
+    <span class="stat-card__hint">{{ efectivoPendiente() }} en efectivo por confirmar</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="alert" [size]="19" /></span>
+    <span class="stat-card__label">Rechazados</span>
+    <span class="stat-card__value">{{ rechazados() }}</span>
+    <span class="stat-card__hint">Pagos no completados</span>
+  </article>
+</section>
+
+<div class="chip-row" style="margin-bottom: 1rem;">
+  @for (filtro of filtros; track filtro.valor) {
+    <button
+      type="button"
+      class="chip"
+      [class.is-active]="estado() === filtro.valor"
+      (click)="filtrarEstado(filtro.valor)">
+      {{ filtro.etiqueta }}
+      <span class="chip__count">{{ conteo()[filtro.valor] }}</span>
+    </button>
+  }
+</div>
+
+<div class="admin-filters">
+  <div class="search-box">
+    <app-icon name="search" [size]="17" />
+    <input
+      class="input"
+      type="search"
+      placeholder="Buscar por pago, orden, cliente o preferencia…"
+      [value]="busqueda()"
+      (input)="buscar($event)"
+      aria-label="Buscar pagos">
+  </div>
+  <select class="select" (change)="cambiarMetodo($event)" aria-label="Filtrar por método de pago">
+    <option value="todos" [selected]="metodo() === 'todos'">Todos los métodos</option>
+    @for (item of metodos(); track item) {
+      <option [value]="item" [selected]="metodo() === item">{{ metodoLegible(item) }}</option>
+    }
+  </select>
+  <button type="button" class="btn btn-ghost btn-sm" (click)="limpiarFiltros()">
+    <app-icon name="close" [size]="14" /> Limpiar
+  </button>
+</div>
+
+@if (cargando()) {
+  <div class="skeleton" style="height: 22rem; border-radius: var(--qm-radius-md);"></div>
+} @else if (filtrados().length === 0) {
+  <div class="empty-state">
+    <span class="empty-state__icon"><app-icon name="card" [size]="26" /></span>
+    <h3>Sin pagos para mostrar</h3>
+    <p>
+      @if (total() === 0) {
+        Aún no se registraron pagos. Los pagos se crean cuando una orden es confirmada.
+      } @else {
+        Ningún pago coincide con los filtros seleccionados.
+      }
+    </p>
+    @if (total() > 0) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Ver todos</button>
+    }
+  </div>
+} @else {
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Pago</th>
+          <th>Orden / cliente</th>
+          <th>Método</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Fecha de pago</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (pago of filtrados(); track (pago.id ?? pago.ordenId)) {
+          <tr>
+            <td class="cell-strong">#{{ pago.id ?? '—' }}</td>
+            <td>
+              <div class="cell-stack">
+                <a [routerLink]="['/boleta', pago.ordenId]" class="cell-strong" style="text-decoration: none;">
+                  Orden #{{ pago.ordenId }}
+                </a>
+                <small>{{ ordenDe(pago.ordenId)?.nombreCliente || 'Cliente sin nombre' }}</small>
+              </div>
+            </td>
+            <td>{{ metodoLegible(pago.metodoPago) }}</td>
+            <td class="cell-strong">S/ {{ pago.monto | number:'1.2-2' }}</td>
+            <td><app-estado-badge [etiqueta]="etiqueta(pago.estadoPago)" [clase]="clase(pago.estadoPago)" /></td>
+            <td>{{ fecha(pago) }}</td>
+            <td>
+              <div class="cell-actions">
+                @if (pago.estadoPago === 'PENDIENTE' && pago.id !== undefined) {
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    [disabled]="confirmando() !== null"
+                    (click)="confirmar(pago)">
+                    @if (confirmando() === pago.id) {
+                      <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                    } @else {
+                      <app-icon [name]="pago.metodoPago === 'EFECTIVO' ? 'cash' : 'check'" [size]="14" />
+                    }
+                    {{ pago.metodoPago === 'EFECTIVO' ? 'Confirmar efectivo' : 'Confirmar pago' }}
+                  </button>
+                }
+                <a class="btn btn-ghost btn-sm" [routerLink]="['/boleta', pago.ordenId]">
+                  <app-icon name="eye" [size]="14" /> Boleta
+                </a>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="toolbar" style="justify-content: space-between; margin-top: 0.9rem;">
+    <span class="results-count">{{ filtrados().length }} pago(s) visibles</span>
+    <span class="results-count">Montos en soles (S/)</span>
+  </div>
+
+  <div class="note mt-2">
+    <strong>Flujo de confirmación:</strong> confirmar un pago lo marca como <strong>PROCESADO</strong>.
+    El servicio de pagos publica un evento y el servicio de órdenes actualiza la reserva de forma
+    asíncrona con Kafka. Por eso la orden puede tardar unos segundos en figurar como pagada.
+    Los pagos con tarjeta y billeteras se confirman desde el flujo del cliente; el efectivo requiere
+    esta confirmación manual.
+  </div>
+}

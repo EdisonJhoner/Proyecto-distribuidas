@@ -1,0 +1,100 @@
+{
+  "realm": "qhalimenu",
+  "enabled": true,
+  "displayName": "QhaliMenu",
+  "loginTheme": "qhalimenu",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["es"],
+  "defaultLocale": "es",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "roles": {
+    "realm": [
+      { "name": "CLIENTE", "description": "Cliente que reserva almuerzo" },
+      { "name": "ADMIN", "description": "Administrador del comedor" },
+      { "name": "CAJA", "description": "Personal de caja que entrega o cancela pedidos pagados" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "qhalimenu-frontend",
+      "name": "QhaliMenu Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:4200",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "http://127.0.0.1:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://127.0.0.1:4200"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:4200/*##http://127.0.0.1:4200/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "cliente1",
+      "enabled": true,
+      "email": "cliente1@qhalimenu.local",
+      "emailVerified": true,
+      "firstName": "Cliente",
+      "lastName": "Uno",
+      "credentials": [
+        { "type": "password", "value": "Cliente123!", "temporary": false }
+      ],
+      "realmRoles": ["CLIENTE"]
+    },
+    {
+      "username": "cli2",
+      "enabled": true,
+      "email": "cli2@qhalimenu.local",
+      "emailVerified": true,
+      "firstName": "Cliente",
+      "lastName": "Dos",
+      "credentials": [
+        { "type": "password", "value": "Cliente123!", "temporary": false }
+      ],
+      "realmRoles": ["CLIENTE"]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@qhalimenu.local",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "QhaliMenu",
+      "credentials": [
+        { "type": "password", "value": "Admin123!", "temporary": false }
+      ],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "caja1",
+      "enabled": true,
+      "email": "caja1@qhalimenu.local",
+      "emailVerified": true,
+      "firstName": "Caja",
+      "lastName": "Uno",
+      "credentials": [
+        { "type": "password", "value": "Caja123!", "temporary": false }
+      ],
+      "realmRoles": ["CAJA"]
+    }
+  ]
+}

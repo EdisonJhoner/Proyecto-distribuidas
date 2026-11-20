@@ -1,7 +1,21 @@
-spring:
+﻿spring:
   application:
     name: qhalimenu-gateway
   profiles:
     active: dev
   config:
-    import: "optional:configserver:${CONFIG_SERVER_URL:http://localhost:18888}"
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:18888}"
+  cloud:
+    config:
+      # Config Server obligatorio: si no responde, falla con un mensaje claro tras reintentar.
+      fail-fast: true
+      # Reintenta contra el Config Server antes de rendirse (arranque en frio / reinicios).
+      retry:
+        max-attempts: 15
+        initial-interval: 1000
+        multiplier: 1.5
+        max-interval: 5000
+  devtools:
+    restart:
+      # Estabilidad en DEMO: un rebuild del IDE ya no reinicia el servicio en caliente.
+      enabled: false

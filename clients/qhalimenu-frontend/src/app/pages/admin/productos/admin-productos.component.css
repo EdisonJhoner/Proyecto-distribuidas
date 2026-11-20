@@ -1,0 +1,9 @@
+:host { display: block; }
+
+.cell-stack small {
+  display: block;
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

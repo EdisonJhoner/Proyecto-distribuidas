@@ -1,0 +1,138 @@
+<div class="page">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Ruta de navegación">
+      <a routerLink="/">Inicio</a>
+      <app-icon name="chevron-right" [size]="13" />
+      <a routerLink="/catalogo">Menú de hoy</a>
+      <app-icon name="chevron-right" [size]="13" />
+      <span>{{ producto()?.nombre ?? 'Detalle' }}</span>
+    </nav>
+
+    @if (cargando()) {
+      <div class="detail-grid">
+        <div class="skeleton" style="aspect-ratio: 5 / 4.3; border-radius: var(--qm-radius-xl);"></div>
+        <div style="display: grid; gap: 1rem;">
+          <div class="skeleton" style="height: 2.6rem; width: 70%;"></div>
+          <div class="skeleton" style="height: 1.1rem; width: 40%;"></div>
+          <div class="skeleton" style="height: 6rem;"></div>
+          <div class="skeleton" style="height: 3rem; width: 60%;"></div>
+        </div>
+      </div>
+    } @else if (error()) {
+      <div class="empty-state">
+        <span class="empty-state__icon"><app-icon name="alert" [size]="26" /></span>
+        <h3>Plato no disponible</h3>
+        <p>{{ error() }}</p>
+        <a class="btn btn-outline" routerLink="/catalogo">
+          <app-icon name="arrow-left" [size]="16" /> Volver al menú
+        </a>
+      </div>
+    } @else if (producto(); as plato) {
+      <div class="detail-grid">
+        <div class="detail-media">
+          <img
+            [src]="imagen()"
+            [alt]="'Fotografía ilustrativa de ' + plato.nombre"
+            (error)="alFallarImagen($event)">
+          @if (plato.categoria?.nombre) {
+            <span class="detail-media__tag">{{ plato.categoria.nombre }}</span>
+          }
+        </div>
+
+        <div class="detail-copy">
+          <div>
+            <span class="eyebrow">Disponible hoy</span>
+            <h1>{{ plato.nombre }}</h1>
+            <p class="lead">
+              {{ plato.descripcion || 'Este plato no tiene una descripción registrada en el catálogo.' }}
+            </p>
+          </div>
+
+          <div class="toolbar" style="justify-content: space-between;">
+            <div class="detail-price"><small>S/</small> {{ plato.precio | number:'1.2-2' }}</div>
+            @if (sinStock()) {
+              <span class="status-badge is-cancelled"><span class="status-badge__dot"></span> Agotado</span>
+            } @else if (plato.stock <= 8) {
+              <span class="status-badge is-pending"><span class="status-badge__dot"></span> Quedan {{ plato.stock }}</span>
+            } @else {
+              <span class="status-badge is-paid"><span class="status-badge__dot"></span> Disponible</span>
+            }
+          </div>
+
+          <div class="detail-facts">
+            <div class="detail-fact">
+              <span>Categoría</span>
+              <strong>{{ plato.categoria?.nombre || 'General' }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>Stock actual</span>
+              <strong>{{ plato.stock }} unidades</strong>
+            </div>
+            <div class="detail-fact">
+              <span>Servicio</span>
+              <strong>Servicio del día</strong>
+            </div>
+            <div class="detail-fact">
+              <span>Recojo</span>
+              <strong>Boleta con QR</strong>
+            </div>
+          </div>
+
+          @if (enCarrito() > 0) {
+            <div class="alert alert-success">
+              <app-icon name="check" [size]="18" />
+              <span>Ya tienes <strong>{{ enCarrito() }}</strong> en el carrito. Puedes ajustar la cantidad aquí.</span>
+            </div>
+          }
+
+          <div class="detail-buy">
+            <div class="qty-control" aria-label="Cantidad">
+              <button type="button" (click)="cambiarCantidad(-1)" [disabled]="cantidad() <= 1" aria-label="Quitar una unidad">
+                <app-icon name="minus" [size]="17" />
+              </button>
+              <span>{{ cantidad() }}</span>
+              <button type="button" (click)="cambiarCantidad(1)" [disabled]="cantidad() >= maximo()" aria-label="Agregar una unidad">
+                <app-icon name="plus" [size]="17" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="btn btn-primary btn-lg"
+              [disabled]="sinStock()"
+              (click)="agregar()">
+              <app-icon name="bag" [size]="18" />
+              {{ sinStock() ? 'Sin stock' : 'Agregar al carrito' }}
+            </button>
+
+            @if (enCarrito() > 0) {
+              <a class="btn btn-ghost" routerLink="/carrito">Ir al carrito <app-icon name="arrow-right" [size]="16" /></a>
+            }
+          </div>
+
+          <p class="tiny muted mb-0">
+            El cobro se realiza en el siguiente paso según el método elegido.
+            Las fotografías son ilustrativas; no representan información nutricional.
+          </p>
+        </div>
+      </div>
+
+      @if (relacionados().length > 0) {
+        <section class="section" style="padding-bottom: 0;">
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">También te puede gustar</span>
+              <h2 class="section-title" style="font-size: clamp(1.5rem, 3vw, 2.1rem);">Más opciones del menú</h2>
+            </div>
+            <a class="btn btn-ghost btn-sm" routerLink="/catalogo">Ver catálogo completo</a>
+          </div>
+          <div class="catalog-grid">
+            @for (item of relacionados(); track item.id; let i = $index) {
+              <app-producto-card [producto]="item" [indice]="i" />
+            }
+          </div>
+        </section>
+      }
+    }
+  </div>
+</div>

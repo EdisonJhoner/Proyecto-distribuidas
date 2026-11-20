@@ -38,6 +38,32 @@ public class CatalogoResiliente {
         return producto;
     }
 
+    public boolean descontarStock(Long idProducto, Integer cantidad) {
+        return Boolean.TRUE.equals(circuitBreakerFactory.create("catalogo").run(
+                () -> {
+                    catalogoClient.descontarStock(idProducto, cantidad);
+                    return true;
+                },
+                throwable -> {
+                    log.warn("No se pudo descontar stock del producto {}: {}",
+                            idProducto, throwable.getMessage());
+                    return false;
+                }));
+    }
+
+    public void restaurarStock(Long idProducto, Integer cantidad) {
+        circuitBreakerFactory.create("catalogo").run(
+                () -> {
+                    catalogoClient.restaurarStock(idProducto, cantidad);
+                    return true;
+                },
+                throwable -> {
+                    log.warn("No se pudo restaurar stock del producto {}: {}",
+                            idProducto, throwable.getMessage());
+                    return false;
+                });
+    }
+
     private CatalogoProductoDto consultarCatalogo(Long idProducto) {
         try {
             return catalogoClient.obtener(idProducto);

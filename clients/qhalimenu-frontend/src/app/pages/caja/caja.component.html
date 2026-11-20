@@ -1,0 +1,271 @@
+<div class="page">
+  <div class="container">
+    <div class="page-head">
+      <div>
+        <span class="eyebrow">Operación de mostrador</span>
+        <h1>Caja · entrega de pedidos</h1>
+        <p>Escanea el QR o registra el código de recojo para entregar o cancelar una reserva.</p>
+      </div>
+      <div class="toolbar">
+        <a class="btn btn-ghost btn-sm" routerLink="/catalogo" target="_blank" rel="noopener">
+          <app-icon name="external" [size]="15" /> Ver catálogo
+        </a>
+        <button type="button" class="btn btn-outline btn-sm" (click)="cargarPendientes()" [disabled]="cargandoPendientes()">
+          <app-icon name="refresh" [size]="15" /> Actualizar cola
+        </button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <article class="stat-card">
+        <span class="stat-card__icon"><app-icon name="package" [size]="19" /></span>
+        <span class="stat-card__label">Por recoger</span>
+        <span class="stat-card__value">{{ totalPendientes() }}</span>
+        <span class="stat-card__hint">Órdenes pagadas en cola</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-card__icon"><app-icon name="cash" [size]="19" /></span>
+        <span class="stat-card__label">Monto en cola</span>
+        <span class="stat-card__value">S/ {{ montoPendiente() | number:'1.2-2' }}</span>
+        <span class="stat-card__hint">Total de reservas pagadas</span>
+      </article>
+      <article class="stat-card stat-card--accent">
+        <span class="stat-card__icon"><app-icon name="qr" [size]="19" /></span>
+        <span class="stat-card__label">Modo de lectura</span>
+        <span class="stat-card__value" style="font-size: 1.2rem;">QR + código</span>
+        <span class="stat-card__hint">Cámara del dispositivo o entrada manual</span>
+      </article>
+    </div>
+
+    <div class="caja-grid">
+      <section class="panel scan-card">
+        <div class="panel__head">
+          <div>
+            <h2 style="font-size: 1.3rem;">Registrar código</h2>
+            <p class="tiny muted mb-0">El código aparece en la boleta digital del cliente.</p>
+          </div>
+          <span class="status-badge is-neutral"><app-icon name="lock" [size]="13" /> Solo caja</span>
+        </div>
+
+        <label class="field">
+          <span>Código de recojo</span>
+          <input
+            class="input scan-input"
+            type="text"
+            [value]="codigo()"
+            (input)="cambiarCodigo($event)"
+            (keyup.enter)="buscar()"
+            placeholder="QMABC123"
+            maxlength="20"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Código de recojo">
+        </label>
+
+        <div class="toolbar">
+          <button type="button" class="btn btn-primary" (click)="buscar()" [disabled]="buscando() || !codigo().trim()">
+            @if (buscando()) {
+              <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Buscando…
+            } @else {
+              <app-icon name="search" [size]="17" /> Buscar reserva
+            }
+          </button>
+          <button type="button" class="btn btn-ghost" (click)="alternarCamara()">
+            <app-icon [name]="escaneando() ? 'close' : 'qr'" [size]="17" />
+            {{ escaneando() ? 'Cerrar cámara' : 'Escanear QR' }}
+          </button>
+        </div>
+
+        @if (error()) {
+          <div class="alert alert-error">
+            <app-icon name="alert" [size]="18" />
+            <span>{{ error() }}</span>
+          </div>
+        }
+
+        @if (avisoCamara()) {
+          <div class="alert alert-warning">
+            <app-icon name="info" [size]="18" />
+            <span>{{ avisoCamara() }}</span>
+          </div>
+        }
+
+        @if (escaneando()) {
+          <div class="camera-box">
+            <video #video autoplay playsinline muted></video>
+            <span class="scan-frame" aria-hidden="true"></span>
+            <span class="camera-box__hint">Apunta el QR de la boleta al recuadro</span>
+          </div>
+        }
+
+        <div class="note">
+          <app-icon name="info" [size]="15" style="vertical-align: -2px;" />
+          La entrega se habilita únicamente cuando la orden está <strong>pagada</strong>.
+          Si el pago figura pendiente, confírmalo primero desde administración.
+        </div>
+      </section>
+
+      <section class="panel">
+        @if (orden(); as reserva) {
+          <div class="caja-order">
+            <div class="panel__head">
+              <div>
+                <h2 style="font-size: 1.3rem; margin: 0;">Reserva #{{ reserva.id }}</h2>
+                <p class="tiny muted mb-0">{{ fecha(reserva) }}</p>
+              </div>
+              <app-estado-badge [etiqueta]="etiqueta(reserva.estado)" [clase]="clase(reserva.estado)" />
+            </div>
+
+            <div class="detail-facts">
+              <div class="detail-fact">
+                <span>Cliente</span>
+                <strong>{{ reserva.nombreCliente || 'Sin nombre registrado' }}</strong>
+              </div>
+              <div class="detail-fact">
+                <span>Código</span>
+                <strong>{{ reserva.codigoRecojo || '—' }}</strong>
+              </div>
+              <div class="detail-fact">
+                <span>Método de pago</span>
+                <strong>{{ metodo(reserva.metodoPago) }}</strong>
+              </div>
+              <div class="detail-fact">
+                <span>Unidades</span>
+                <strong>{{ unidades(reserva) }}</strong>
+              </div>
+            </div>
+
+            @if (reserva.detalles?.length) {
+              <div class="order-card__items">
+                @for (detalle of reserva.detalles; track detalle.id) {
+                  <span>
+                    <span><strong>{{ detalle.cantidad }} ×</strong> {{ detalle.nombreProducto || ('Producto #' + detalle.idProducto) }}</span>
+                    <small>S/ {{ detalle.precioUnitario * detalle.cantidad | number:'1.2-2' }}</small>
+                  </span>
+                }
+              </div>
+            }
+
+            <div class="toolbar" style="justify-content: space-between; border-top: 1px solid var(--qm-line); padding-top: 0.9rem;">
+              <span class="order-card__total">S/ {{ reserva.total | number:'1.2-2' }}</span>
+              <div class="toolbar">
+                @if (puedeEntregar()) {
+                  <button type="button" class="btn btn-primary" (click)="entregar()" [disabled]="actuando() !== null">
+                    @if (actuando() === 'entregar') {
+                      <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Entregando…
+                    } @else {
+                      <app-icon name="check" [size]="17" /> Marcar entregada
+                    }
+                  </button>
+                }
+                @if (puedeCancelar()) {
+                  <button type="button" class="btn btn-danger" (click)="cancelar()" [disabled]="actuando() !== null">
+                    @if (actuando() === 'cancelar') {
+                      <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Cancelando…
+                    } @else {
+                      <app-icon name="close" [size]="17" /> Cancelar y devolver stock
+                    }
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (reserva.estado === 'ENTREGADA') {
+              <div class="alert alert-success mb-0">
+                <app-icon name="check" [size]="18" />
+                <span>Reserva entregada. El pedido quedó completado.</span>
+              </div>
+            } @else if (reserva.estado === 'CANCELADA') {
+              <div class="alert alert-error mb-0">
+                <app-icon name="alert" [size]="18" />
+                <span>Reserva cancelada. El stock fue devuelto al catálogo.</span>
+              </div>
+            } @else if (reserva.estado === 'PENDIENTE_PAGO') {
+              <div class="alert alert-warning mb-0">
+                <app-icon name="clock" [size]="18" />
+                <span>El pago aún no está confirmado. No se puede entregar todavía.</span>
+              </div>
+            }
+
+            <div class="toolbar">
+              <a class="btn btn-ghost btn-sm" [routerLink]="['/boleta', reserva.id]">
+                <app-icon name="download" [size]="15" /> Ver boleta completa
+              </a>
+              <button type="button" class="btn-link" (click)="orden.set(null); codigo.set(''); error.set('')">
+                <app-icon name="close" [size]="14" /> Limpiar
+              </button>
+            </div>
+          </div>
+        } @else {
+          <div class="empty-state" style="border-style: solid; background: transparent;">
+            <span class="empty-state__icon"><app-icon name="qr" [size]="27" /></span>
+            <h3>Esperando un código</h3>
+            <p>Escanea el QR de la boleta o escribe su código para consultar la reserva.</p>
+            <p class="tiny muted mb-0">También puedes elegir una orden de la cola de recojo.</p>
+          </div>
+        }
+      </section>
+    </div>
+
+    <section class="panel mt-3">
+      <div class="panel__head">
+        <div>
+          <h2 style="font-size: 1.3rem;">Cola de recojo</h2>
+          <p class="tiny muted mb-0">Reservas pagadas que aún no fueron entregadas.</p>
+        </div>
+        <span class="results-count">{{ totalPendientes() }} {{ totalPendientes() === 1 ? 'orden' : 'órdenes' }}</span>
+      </div>
+
+      @if (cargandoPendientes()) {
+        <div class="loading-block"><span class="spinner"></span><span>Cargando cola…</span></div>
+      } @else if (pendientes().length === 0) {
+        <div class="empty-state">
+          <span class="empty-state__icon"><app-icon name="check" [size]="26" /></span>
+          <h3>No hay pedidos esperando recojo</h3>
+          <p>Cuando un cliente pague su reserva, aparecerá aquí automáticamente.</p>
+          <button type="button" class="btn btn-outline btn-sm" (click)="cargarPendientes()">
+            <app-icon name="refresh" [size]="15" /> Volver a consultar
+          </button>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Cliente</th>
+                <th>Pago</th>
+                <th>Total</th>
+                <th>Hora de pago</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of pendientes(); track item.id) {
+                <tr [class.is-selected]="orden()?.id === item.id">
+                  <td class="cell-strong">{{ item.codigoRecojo || '—' }}</td>
+                  <td>
+                    <div class="cell-stack">
+                      <span>{{ item.nombreCliente || 'Cliente' }}</span>
+                      <small>Reserva #{{ item.id }} · {{ unidades(item) }} u.</small>
+                    </div>
+                  </td>
+                  <td>{{ metodo(item.metodoPago) }}</td>
+                  <td class="cell-strong">S/ {{ item.total | number:'1.2-2' }}</td>
+                  <td>{{ fecha(item) }}</td>
+                  <td>
+                    <div class="cell-actions">
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="usar(item)">
+                        <app-icon name="eye" [size]="14" /> Usar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </div>
+</div>

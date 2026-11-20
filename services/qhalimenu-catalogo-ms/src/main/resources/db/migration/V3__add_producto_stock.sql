@@ -1,0 +1,3 @@
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 0;
+
+UPDATE productos SET stock = 50 WHERE stock = 0;

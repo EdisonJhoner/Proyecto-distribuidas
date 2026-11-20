@@ -1,0 +1,50 @@
+<article class="dish-card" [style.--i]="indice()">
+  <a class="dish-card__media" [routerLink]="['/producto', producto().id]" [attr.aria-label]="'Ver ' + producto().nombre">
+    <img
+      [src]="imagen()"
+      [alt]="'Fotografía ilustrativa de ' + producto().nombre"
+      loading="lazy"
+      (error)="alFallarImagen($event)">
+    @if (producto().categoria?.nombre) {
+      <span class="dish-card__cat">{{ producto().categoria?.nombre }}</span>
+    }
+    @if (sinStock()) {
+      <span class="dish-card__stock is-out">Agotado</span>
+    } @else if (stockBajo()) {
+      <span class="dish-card__stock is-low">Quedan {{ producto().stock }}</span>
+    } @else {
+      <span class="dish-card__stock">Disponible</span>
+    }
+  </a>
+
+  <div class="dish-card__body">
+    <h3 class="dish-card__title">
+      <a [routerLink]="['/producto', producto().id]">{{ producto().nombre }}</a>
+    </h3>
+    @if (descripcion()) {
+      <p class="dish-card__desc">{{ descripcion() }}</p>
+    } @else {
+      <p class="dish-card__desc muted">Sin descripción registrada.</p>
+    }
+
+    <div class="dish-card__footer">
+      <span class="dish-card__price">
+        <small>S/</small> {{ producto().precio | number:'1.2-2' }}
+      </span>
+      @if (enCarrito() > 0) {
+        <a class="dish-card__cart-link" routerLink="/carrito">
+          {{ enCarrito() }} en el carrito
+          <app-icon name="arrow-right" [size]="15" />
+        </a>
+      }
+      <button
+        type="button"
+        class="btn btn-primary btn-round dish-card__add"
+        [disabled]="sinStock()"
+        (click)="agregar($event)"
+        [attr.aria-label]="'Agregar ' + producto().nombre + ' al carrito'">
+        <app-icon [name]="enCarrito() > 0 ? 'check' : 'plus'" [size]="18" />
+      </button>
+    </div>
+  </div>
+</article>

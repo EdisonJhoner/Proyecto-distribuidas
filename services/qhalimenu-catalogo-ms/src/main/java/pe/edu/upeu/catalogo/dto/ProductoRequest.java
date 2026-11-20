@@ -1,6 +1,7 @@
 package pe.edu.upeu.catalogo.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -26,6 +27,10 @@ public class ProductoRequest {
 
     @NotNull
     private Boolean activo;
+
+    @NotNull
+    @Min(0)
+    private Integer stock;
 
     @NotNull
     private Long categoriaId;

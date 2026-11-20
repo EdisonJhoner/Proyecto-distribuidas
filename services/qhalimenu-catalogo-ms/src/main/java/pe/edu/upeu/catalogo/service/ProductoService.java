@@ -5,6 +5,7 @@ import pe.edu.upeu.catalogo.dto.ProductoResponse;
 import pe.edu.upeu.catalogo.entity.Categoria;
 import pe.edu.upeu.catalogo.entity.Producto;
 import pe.edu.upeu.catalogo.exception.ResourceNotFoundException;
+import pe.edu.upeu.catalogo.exception.StockInsuficienteException;
 import pe.edu.upeu.catalogo.mapper.ProductoMapper;
 import pe.edu.upeu.catalogo.repository.CategoriaRepository;
 import pe.edu.upeu.catalogo.repository.ProductoRepository;
@@ -48,8 +49,34 @@ public class ProductoService {
         producto.setDescripcion(request.getDescripcion());
         producto.setPrecio(request.getPrecio());
         producto.setActivo(request.getActivo());
+        producto.setStock(request.getStock() == null ? producto.getStock() : request.getStock());
         producto.setCategoria(buscarCategoriaOFallar(request.getCategoriaId()));
         return productoMapper.toResponse(productoRepository.save(producto));
+    }
+
+    @Transactional
+    public void descontarStock(Long id, Integer cantidad) {
+        if (cantidad == null || cantidad <= 0) {
+            throw new StockInsuficienteException("Cantidad invalida para descontar stock: " + cantidad);
+        }
+        Producto producto = buscarOFallar(id);
+        int actual = producto.getStock() == null ? 0 : producto.getStock();
+        if (actual < cantidad) {
+            throw new StockInsuficienteException("Stock insuficiente para el producto: " + id);
+        }
+        producto.setStock(actual - cantidad);
+        productoRepository.save(producto);
+    }
+
+    @Transactional
+    public void restaurarStock(Long id, Integer cantidad) {
+        if (cantidad == null || cantidad <= 0) {
+            throw new StockInsuficienteException("Cantidad invalida para restaurar stock: " + cantidad);
+        }
+        Producto producto = buscarOFallar(id);
+        int actual = producto.getStock() == null ? 0 : producto.getStock();
+        producto.setStock(actual + cantidad);
+        productoRepository.save(producto);
     }
 
     @Transactional

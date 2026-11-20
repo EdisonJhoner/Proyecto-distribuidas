@@ -1,0 +1,143 @@
+<div class="page">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Ruta de navegación">
+      <a routerLink="/">Inicio</a>
+      <app-icon name="chevron-right" [size]="13" />
+      <span>Mi perfil</span>
+    </nav>
+
+    <div class="page-head">
+      <div>
+        <span class="eyebrow">Cuenta y actividad</span>
+        <h1>Mi perfil</h1>
+        <p>Identidad autenticada por Keycloak y resumen real de tus reservas.</p>
+      </div>
+      <a class="btn btn-ghost" routerLink="/mis-ordenes">
+        <app-icon name="package" [size]="17" /> Ver todas mis reservas
+      </a>
+    </div>
+
+    <div class="profile-grid">
+      <aside class="card card--pad profile-card">
+        <span class="profile-avatar">{{ keycloak.iniciales() }}</span>
+        <h2>{{ keycloak.nombre() || 'Cliente QhaliMenu' }}</h2>
+        <p>{{ keycloak.rolPrincipal() }} · cuenta institucional</p>
+
+        <div class="profile-facts">
+          <div>
+            <app-icon name="user" [size]="16" />
+            <span><strong>Usuario:</strong> {{ keycloak.username() || '—' }}</span>
+          </div>
+          <div>
+            <app-icon name="mail" [size]="16" />
+            <span><strong>Correo:</strong> {{ keycloak.email() || 'No registrado en el token' }}</span>
+          </div>
+          <div>
+            <app-icon name="shield" [size]="16" />
+            <span><strong>Rol:</strong> {{ keycloak.rolPrincipal() }}</span>
+          </div>
+          <div>
+            <app-icon name="lock" [size]="16" />
+            <span><strong>Identificador:</strong> {{ subCorto() }}</span>
+          </div>
+        </div>
+
+        <div class="profile-stats">
+          <div class="profile-stat">
+            <strong>{{ totalReservas() }}</strong>
+            <span>Reservas</span>
+          </div>
+          <div class="profile-stat">
+            <strong>{{ pagadas() }}</strong>
+            <span>Pagadas</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-outline btn-block mt-2" (click)="keycloak.logout()">
+          <app-icon name="logout" [size]="16" /> Cerrar sesión
+        </button>
+      </aside>
+
+      <div style="display: grid; gap: 1rem;">
+        <section class="stats-grid" style="margin-bottom: 0;">
+          <article class="stat-card">
+            <span class="stat-card__icon"><app-icon name="package" [size]="19" /></span>
+            <span class="stat-card__label">Reservas totales</span>
+            <span class="stat-card__value">{{ totalReservas() }}</span>
+            <span class="stat-card__hint">Historial completo</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-card__icon"><app-icon name="check" [size]="19" /></span>
+            <span class="stat-card__label">Entregadas</span>
+            <span class="stat-card__value">{{ entregadas() }}</span>
+            <span class="stat-card__hint">Almuerzos recogidos</span>
+          </article>
+          <article class="stat-card stat-card--accent">
+            <span class="stat-card__icon"><app-icon name="chart" [size]="19" /></span>
+            <span class="stat-card__label">Consumo confirmado</span>
+            <span class="stat-card__value">S/ {{ gastado() | number:'1.2-2' }}</span>
+            <span class="stat-card__hint">Solo reservas pagadas</span>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel__head">
+            <div>
+              <h2 style="font-size: 1.3rem;">Actividad reciente</h2>
+              <p class="tiny muted mb-0">Tus últimas reservas registradas en el servicio de órdenes.</p>
+            </div>
+            <a class="btn-link" routerLink="/catalogo">Nueva reserva <app-icon name="arrow-right" [size]="15" /></a>
+          </div>
+
+          @if (cargando()) {
+            <div class="loading-block"><span class="spinner"></span><span>Cargando actividad…</span></div>
+          } @else if (error()) {
+            <div class="alert alert-error">
+              <app-icon name="alert" [size]="18" />
+              <span>{{ error() }}</span>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm mt-2" (click)="cargar()">
+              <app-icon name="refresh" [size]="15" /> Reintentar
+            </button>
+          } @else if (recientes().length === 0) {
+            <div class="empty-state">
+              <span class="empty-state__icon"><app-icon name="utensils" [size]="25" /></span>
+              <h3>Aún no tienes reservas</h3>
+              <p>Cuando reserves tu primer almuerzo aparecerá aquí con su estado y boleta.</p>
+              <a class="btn btn-primary btn-sm" routerLink="/catalogo">Ver menú de hoy</a>
+            </div>
+          } @else {
+            <div class="order-list">
+              @for (orden of recientes(); track orden.id) {
+                <article class="order-card">
+                  <div class="order-card__head">
+                    <div class="order-card__id">
+                      <strong>Reserva #{{ orden.id }}</strong>
+                      <small>{{ fecha(orden) }}</small>
+                    </div>
+                    <app-estado-badge [etiqueta]="etiqueta(orden.estado)" [clase]="clase(orden.estado)" />
+                  </div>
+                  <div class="order-card__foot">
+                    <span class="order-card__total">S/ {{ orden.total | number:'1.2-2' }}</span>
+                    <a class="btn btn-ghost btn-sm" [routerLink]="['/boleta', orden.id]">
+                      <app-icon name="download" [size]="15" /> Ver boleta
+                    </a>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </section>
+
+        <section class="note">
+          <strong>Nota de transparencia sobre tus datos.</strong>
+          La sesión entrega nombre, correo y roles desde Keycloak, pero el token no incluye
+          un identificador de cliente ni un número de documento. Por eso este perfil no
+          inventa ni edita una ficha de cliente: muestra tu identidad real y tus reservas
+          reales. La creación o actualización de la ficha de cliente se gestiona desde
+          administración.
+        </section>
+      </div>
+    </div>
+  </div>
+</div>

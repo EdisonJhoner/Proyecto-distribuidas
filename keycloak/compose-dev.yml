@@ -1,4 +1,4 @@
-﻿name: qhalimenu-keycloak-dev
+name: qhalimenu-keycloak-dev
 services:
   keycloak-db:
     image: postgres:17-alpine
@@ -23,7 +23,7 @@ services:
     image: quay.io/keycloak/keycloak:26.0.7
     container_name: qhalimenu-keycloak
     restart: unless-stopped
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin123
@@ -36,12 +36,19 @@ services:
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_METRICS_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      KC_LOG: console,file
+      # DEV: recarga el tema sin reiniciar el contenedor al editar CSS/FTL.
+      KC_SPI_THEME_CACHE_THEMES: "false"
+      KC_SPI_THEME_CACHE_TEMPLATES: "false"
+      KC_SPI_THEME_STATIC_MAX_AGE: "-1"
     ports:
       - "18180:8080"
       - "19000:9000"
     volumes:
       - qhalimenu_keycloak_dev_data:/opt/keycloak/data
       - ./logs:/opt/keycloak/data/log
+      - ./import:/opt/keycloak/data/import
+      - ./themes/qhalimenu:/opt/keycloak/themes/qhalimenu:ro
     depends_on:
       keycloak-db:
         condition: service_healthy

@@ -99,6 +99,16 @@ class SagaPagoTest {
     }
 
     @Test
+    void ordenCreadaConYapeQuedaPendienteHastaConfirmarLaTransferencia() throws Exception {
+        kafkaTemplate.send("orden-eventos", "810", ordenCreadaYape(810L)).get(10, TimeUnit.SECONDS);
+
+        Pago pago = esperarPago(810L);
+        assertEquals("PENDIENTE", pago.getEstadoPago(),
+                "Un pago Yape no debe aprobarse hasta que el cliente confirme Ya transferí");
+        assertEquals("YAPE", pago.getMetodoPago());
+    }
+
+    @Test
     void ordenCreadaEnEfectivoQuedaPendienteHastaConfirmarElCobro() throws Exception {
         kafkaTemplate.send("orden-eventos", "800", ordenCreadaEfectivo(800L)).get(10, TimeUnit.SECONDS);
 
@@ -128,6 +138,20 @@ class SagaPagoTest {
                 "PENDIENTE_PAGO",
                 Instant.now(),
                 List.of(new OrdenItemEvento(10L, 2, new BigDecimal("15.00"))));
+    }
+
+    private OrdenCreadaEvento ordenCreadaYape(Long ordenId) {
+        return new OrdenCreadaEvento(
+                UUID.randomUUID().toString(),
+                OrdenCreadaEvento.TIPO,
+                ordenId,
+                "1",
+                new BigDecimal("18.00"),
+                "YAPE",
+                "ANTICIPADO",
+                "PENDIENTE_PAGO",
+                Instant.now(),
+                List.of(new OrdenItemEvento(10L, 1, new BigDecimal("18.00"))));
     }
 
     private OrdenCreadaEvento ordenCreadaEfectivo(Long ordenId) {

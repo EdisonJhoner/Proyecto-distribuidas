@@ -1,0 +1,99 @@
+<header class="site-header" [class.is-scrolled]="desplazado()">
+  <div class="site-header__inner container">
+    <app-logo />
+
+    <nav class="site-nav" aria-label="Navegación principal">
+      <a routerLink="/catalogo" routerLinkActive="is-active">Menú de hoy</a>
+      <a routerLink="/" fragment="beneficios">Beneficios</a>
+      <a routerLink="/" fragment="como-funciona">Cómo funciona</a>
+      @if (keycloak.esAdmin()) {
+        <a routerLink="/admin" routerLinkActive="is-active">Panel</a>
+      }
+      @if (keycloak.esCaja()) {
+        <a routerLink="/caja" routerLinkActive="is-active">Caja</a>
+      }
+    </nav>
+
+    <div class="site-header__actions">
+      @if (!keycloak.esAdmin() && !keycloak.esCaja()) {
+        <a class="cart-pill" routerLink="/carrito" [attr.aria-label]="'Carrito, ' + carrito.totalUnidades() + ' unidades'">
+          <app-icon name="bag" [size]="18" />
+          <span class="cart-pill__text">Carrito</span>
+          <span class="cart-pill__count">{{ carrito.totalUnidades() }}</span>
+        </a>
+      }
+
+      @if (keycloak.autenticado()) {
+        <div class="user-menu">
+          <button type="button" class="user-menu__trigger" (click)="alternarUsuario($event)" [attr.aria-expanded]="usuarioAbierto()">
+            <span class="avatar">{{ keycloak.iniciales() }}</span>
+            <span class="user-menu__name">
+              <strong>{{ keycloak.nombre() }}</strong>
+              <small>{{ keycloak.rolPrincipal() }}</small>
+            </span>
+            <app-icon name="chevron-down" [size]="16" />
+          </button>
+
+          @if (usuarioAbierto()) {
+            <div class="user-menu__panel" (click)="$event.stopPropagation()">
+              <div class="user-menu__head">
+                <strong>{{ keycloak.nombre() }}</strong>
+                <span>{{ keycloak.email() }}</span>
+              </div>
+              @if (keycloak.esCliente()) {
+                <a routerLink="/perfil"><app-icon name="user" [size]="16" /> Mi perfil</a>
+                <a routerLink="/mis-ordenes"><app-icon name="package" [size]="16" /> Mis reservas</a>
+              }
+              @if (keycloak.esAdmin()) {
+                <a routerLink="/admin"><app-icon name="chart" [size]="16" /> Panel administrativo</a>
+              }
+              @if (keycloak.esCaja()) {
+                <a routerLink="/caja"><app-icon name="qr" [size]="16" /> Módulo de caja</a>
+              }
+              <button type="button" class="user-menu__logout" (click)="salir()">
+                <app-icon name="logout" [size]="16" /> Cerrar sesión
+              </button>
+            </div>
+          }
+        </div>
+      } @else {
+        <a class="btn btn-ghost btn-sm" routerLink="/login">Iniciar sesión</a>
+        <a class="btn btn-primary btn-sm" routerLink="/catalogo">Reservar</a>
+      }
+
+      <button type="button" class="icon-btn mobile-toggle" (click)="alternarMenu()" [attr.aria-expanded]="menuAbierto()" aria-label="Abrir menú">
+        <app-icon [name]="menuAbierto() ? 'close' : 'menu'" [size]="22" />
+      </button>
+    </div>
+  </div>
+
+  @if (menuAbierto()) {
+    <div class="mobile-drawer">
+      <nav aria-label="Navegación móvil">
+        <a routerLink="/catalogo" (click)="menuAbierto.set(false)">Menú de hoy <app-icon name="chevron-right" [size]="18" /></a>
+        <a routerLink="/" fragment="beneficios" (click)="menuAbierto.set(false)">Beneficios <app-icon name="chevron-right" [size]="18" /></a>
+        <a routerLink="/" fragment="como-funciona" (click)="menuAbierto.set(false)">Cómo funciona <app-icon name="chevron-right" [size]="18" /></a>
+        @if (keycloak.esCliente() && keycloak.autenticado()) {
+          <a routerLink="/carrito" (click)="menuAbierto.set(false)">Carrito ({{ carrito.totalUnidades() }}) <app-icon name="chevron-right" [size]="18" /></a>
+          <a routerLink="/mis-ordenes" (click)="menuAbierto.set(false)">Mis reservas <app-icon name="chevron-right" [size]="18" /></a>
+          <a routerLink="/perfil" (click)="menuAbierto.set(false)">Mi perfil <app-icon name="chevron-right" [size]="18" /></a>
+        }
+        @if (keycloak.esAdmin()) {
+          <a routerLink="/admin" (click)="menuAbierto.set(false)">Panel administrativo <app-icon name="chevron-right" [size]="18" /></a>
+        }
+        @if (keycloak.esCaja()) {
+          <a routerLink="/caja" (click)="menuAbierto.set(false)">Caja <app-icon name="chevron-right" [size]="18" /></a>
+        }
+      </nav>
+      <div class="mobile-drawer__actions">
+        @if (keycloak.autenticado()) {
+          <button type="button" class="btn btn-ghost btn-block" (click)="salir()">
+            <app-icon name="logout" [size]="17" /> Cerrar sesión
+          </button>
+        } @else {
+          <a class="btn btn-primary btn-block" routerLink="/login" (click)="menuAbierto.set(false)">Iniciar sesión</a>
+        }
+      </div>
+    </div>
+  }
+</header>

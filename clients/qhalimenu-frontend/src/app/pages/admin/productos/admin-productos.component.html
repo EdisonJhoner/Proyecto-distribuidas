@@ -1,0 +1,293 @@
+<div class="admin-page-head">
+  <div>
+    <span class="eyebrow">Catálogo</span>
+    <h1>Gestión de productos</h1>
+    <p>Crea, edita y retira los platos que se ofrecen en el menú del día.</p>
+  </div>
+  <div class="toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" (click)="cargar()" [disabled]="cargando()">
+      <app-icon name="refresh" [size]="15" /> Actualizar
+    </button>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      [disabled]="categorias().length === 0"
+      (click)="abrirNuevo()">
+      <app-icon name="plus" [size]="16" /> Nuevo producto
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="alert alert-error" style="margin-bottom: 1rem;">
+    <app-icon name="alert" [size]="18" />
+    <span>{{ error() }}</span>
+  </div>
+}
+
+@if (categorias().length === 0 && !cargando()) {
+  <div class="alert alert-warning" style="margin-bottom: 1rem;">
+    <app-icon name="info" [size]="18" />
+    <span>
+      No hay categorías registradas. Crea una categoría en
+      <a href="/admin/categorias">Categorías</a> antes de agregar productos.
+    </span>
+  </div>
+}
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="utensils" [size]="19" /></span>
+    <span class="stat-card__label">Productos</span>
+    <span class="stat-card__value">{{ total() }}</span>
+    <span class="stat-card__hint">Registrados en el catálogo</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="eye" [size]="19" /></span>
+    <span class="stat-card__label">Visibles</span>
+    <span class="stat-card__value">{{ activos() }}</span>
+    <span class="stat-card__hint">Se muestran a los clientes</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="eye-off" [size]="19" /></span>
+    <span class="stat-card__label">Ocultos</span>
+    <span class="stat-card__value">{{ inactivos() }}</span>
+    <span class="stat-card__hint">Fuera del catálogo público</span>
+  </article>
+  <article class="stat-card stat-card--accent">
+    <span class="stat-card__icon"><app-icon name="alert" [size]="19" /></span>
+    <span class="stat-card__label">Agotados</span>
+    <span class="stat-card__value">{{ agotados() }}</span>
+    <span class="stat-card__hint">Visibles pero sin stock</span>
+  </article>
+</section>
+
+<div class="admin-filters">
+  <div class="search-box">
+    <app-icon name="search" [size]="17" />
+    <input
+      class="input"
+      type="search"
+      placeholder="Buscar por nombre, descripción o categoría…"
+      [value]="busqueda()"
+      (input)="buscar($event)"
+      aria-label="Buscar productos">
+  </div>
+  <select class="select" (change)="filtrarCategoria($event)" aria-label="Filtrar por categoría">
+    <option value="todas" [selected]="categoriaFiltro() === 'todas'">Todas las categorías</option>
+    @for (cat of categorias(); track cat.id) {
+      <option [value]="cat.id" [selected]="categoriaFiltro() === cat.id">{{ cat.nombre }}</option>
+    }
+  </select>
+  <select class="select" (change)="filtrarEstado($event)" aria-label="Filtrar por estado">
+    <option value="todos" [selected]="estadoFiltro() === 'todos'">Todos los estados</option>
+    <option value="activos" [selected]="estadoFiltro() === 'activos'">Visibles</option>
+    <option value="inactivos" [selected]="estadoFiltro() === 'inactivos'">Ocultos</option>
+    <option value="agotados" [selected]="estadoFiltro() === 'agotados'">Agotados</option>
+  </select>
+  @if (hayFiltro()) {
+    <button type="button" class="btn btn-ghost btn-sm" (click)="limpiarFiltros()">
+      <app-icon name="close" [size]="14" /> Limpiar
+    </button>
+  }
+</div>
+
+@if (cargando()) {
+  <div class="skeleton" style="height: 20rem; border-radius: var(--qm-radius-md);"></div>
+} @else if (filtrados().length === 0) {
+  <div class="empty-state">
+    <span class="empty-state__icon"><app-icon name="utensils" [size]="26" /></span>
+    <h3>{{ hayFiltro() ? 'Sin resultados' : 'Aún no hay productos' }}</h3>
+    <p>
+      @if (hayFiltro()) {
+        No encontramos productos con esos filtros. Prueba cambiando la búsqueda.
+      } @else {
+        Agrega el primer plato del menú para que los clientes puedan reservarlo.
+      }
+    </p>
+    @if (hayFiltro()) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Ver todos</button>
+    } @else {
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="categorias().length === 0" (click)="abrirNuevo()">
+        <app-icon name="plus" [size]="15" /> Crear producto
+      </button>
+    }
+  </div>
+} @else {
+  <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.6rem;">
+    <span class="results-count">{{ filtrados().length }} de {{ total() }} productos</span>
+    <span class="results-count">Precios en soles (S/)</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Categoría</th>
+          <th>Precio</th>
+          <th>Stock</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (producto of filtrados(); track producto.id) {
+          <tr [class.is-selected]="editando()?.id === producto.id">
+            <td>
+              <div class="cell-stack">
+                <span class="cell-strong">{{ producto.nombre }}</span>
+                <small>{{ descripcionCorta(producto) }}</small>
+              </div>
+            </td>
+            <td>{{ producto.categoria?.nombre || 'Sin categoría' }}</td>
+            <td class="cell-strong">S/ {{ producto.precio | number:'1.2-2' }}</td>
+            <td>
+              @if (producto.stock <= 0) {
+                <span class="status-badge is-cancelled"><span class="status-badge__dot"></span> Agotado</span>
+              } @else if (producto.stock <= 8) {
+                <span class="status-badge is-pending"><span class="status-badge__dot"></span> {{ producto.stock }} u.</span>
+              } @else {
+                <span class="cell-strong">{{ producto.stock }} u.</span>
+              }
+            </td>
+            <td>
+              @if (producto.activo === false) {
+                <span class="status-badge is-neutral"><span class="status-badge__dot"></span> Oculto</span>
+              } @else {
+                <span class="status-badge is-paid"><span class="status-badge__dot"></span> Visible</span>
+              }
+            </td>
+            <td>
+              <div class="cell-actions">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="editar(producto)">
+                  <app-icon name="edit" [size]="14" /> Editar
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  [disabled]="eliminando() === producto.id"
+                  (click)="eliminar(producto)">
+                  @if (eliminando() === producto.id) {
+                    <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                  } @else {
+                    <app-icon name="trash" [size]="14" />
+                  }
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="titulo-producto" (click)="$event.stopPropagation()">
+      <div class="modal__head">
+        <div>
+          <span class="eyebrow" style="margin-bottom: 0.3rem;">Catálogo</span>
+          <h2 id="titulo-producto">{{ editando() ? 'Editar producto' : 'Nuevo producto' }}</h2>
+          <p class="tiny muted mb-0">
+            {{ editando() ? 'Los cambios se reflejan de inmediato en el catálogo.' : 'El producto aparecerá en el menú si queda visible y con stock.' }}
+          </p>
+        </div>
+        <button type="button" class="icon-btn" (click)="cerrarModal()" aria-label="Cerrar formulario">
+          <app-icon name="close" [size]="20" />
+        </button>
+      </div>
+
+      <form (submit)="guardar(); $event.preventDefault()">
+        <div class="form-grid">
+          <label class="field">
+            <span>Nombre del plato</span>
+            <input
+              class="input"
+              type="text"
+              [value]="form().nombre"
+              (input)="cambiarTexto('nombre', $event)"
+              maxlength="100"
+              placeholder="Ej. Lomo saltado"
+              required>
+          </label>
+
+          <label class="field">
+            <span>Descripción</span>
+            <textarea
+              class="textarea"
+              [value]="form().descripcion"
+              (input)="cambiarTexto('descripcion', $event)"
+              maxlength="255"
+              placeholder="Ingredientes o acompañamientos del plato"></textarea>
+            <small>Se muestra en el detalle del producto.</small>
+          </label>
+
+          <div class="form-row">
+            <label class="field">
+              <span>Precio (S/)</span>
+              <input
+                class="input"
+                type="number"
+                min="0.01"
+                step="0.01"
+                [value]="form().precio ?? ''"
+                (input)="cambiarNumero('precio', $event)"
+                placeholder="0.00"
+                required>
+            </label>
+            <label class="field">
+              <span>Stock disponible</span>
+              <input
+                class="input"
+                type="number"
+                min="0"
+                step="1"
+                [value]="form().stock ?? ''"
+                (input)="cambiarNumero('stock', $event)"
+                placeholder="0"
+                required>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="field">
+              <span>Categoría</span>
+              <select class="select" (change)="cambiarCategoria($event)" required>
+                <option value="" [selected]="form().categoriaId === null" disabled>Selecciona una categoría</option>
+                @for (cat of categorias(); track cat.id) {
+                  <option [value]="cat.id" [selected]="form().categoriaId === cat.id">{{ cat.nombre }}</option>
+                }
+              </select>
+            </label>
+            <label class="check-row" style="align-self: end; padding-bottom: 0.75rem;">
+              <input type="checkbox" [checked]="form().activo" (change)="cambiarActivo($event)">
+              Visible en el catálogo
+            </label>
+          </div>
+
+          @if (errorForm()) {
+            <div class="alert alert-error">
+              <app-icon name="alert" [size]="17" />
+              <span>{{ errorForm() }}</span>
+            </div>
+          }
+
+          <div class="modal__actions">
+            <button type="button" class="btn btn-ghost" (click)="cerrarModal()" [disabled]="guardando()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="guardando()">
+              @if (guardando()) {
+                <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Guardando…
+              } @else {
+                <app-icon name="check" [size]="17" />
+                {{ editando() ? 'Guardar cambios' : 'Crear producto' }}
+              }
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -1,0 +1,215 @@
+<div class="admin-page-head">
+  <div>
+    <span class="eyebrow">Directorio</span>
+    <h1>Gestión de clientes</h1>
+    <p>Registra y actualiza los datos de contacto de los clientes del comedor.</p>
+  </div>
+  <div class="toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" (click)="cargar()" [disabled]="cargando()">
+      <app-icon name="refresh" [size]="15" /> Actualizar
+    </button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+      <app-icon name="plus" [size]="16" /> Nuevo cliente
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="alert alert-error" style="margin-bottom: 1rem;">
+    <app-icon name="alert" [size]="18" />
+    <span>{{ error() }}</span>
+  </div>
+}
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="users" [size]="19" /></span>
+    <span class="stat-card__label">Clientes</span>
+    <span class="stat-card__value">{{ total() }}</span>
+    <span class="stat-card__hint">Registrados en el directorio</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="shield" [size]="19" /></span>
+    <span class="stat-card__label">Con DNI</span>
+    <span class="stat-card__value">{{ conDni() }}</span>
+    <span class="stat-card__hint">Documento de 8 dígitos</span>
+  </article>
+  <article class="stat-card stat-card--accent">
+    <span class="stat-card__icon"><app-icon name="info" [size]="19" /></span>
+    <span class="stat-card__label">Otros documentos</span>
+    <span class="stat-card__value">{{ otrosDocumentos() }}</span>
+    <span class="stat-card__hint">Carné, pasaporte u otro</span>
+  </article>
+</section>
+
+<div class="admin-filters">
+  <div class="search-box">
+    <app-icon name="search" [size]="17" />
+    <input
+      class="input"
+      type="search"
+      placeholder="Buscar por nombre, documento o celular…"
+      [value]="busqueda()"
+      (input)="buscar($event)"
+      aria-label="Buscar clientes">
+  </div>
+  <span class="results-count">{{ filtrados().length }} de {{ total() }}</span>
+</div>
+
+@if (cargando()) {
+  <div class="skeleton" style="height: 18rem; border-radius: var(--qm-radius-md);"></div>
+} @else if (filtrados().length === 0) {
+  <div class="empty-state">
+    <span class="empty-state__icon"><app-icon name="users" [size]="26" /></span>
+    <h3>{{ busqueda().trim() ? 'Sin coincidencias' : 'Aún no hay clientes registrados' }}</h3>
+    <p>
+      @if (busqueda().trim()) {
+        No encontramos clientes con ese criterio de búsqueda.
+      } @else {
+        Registra la ficha del primer cliente para asociarle reservas y comprobantes.
+      }
+    </p>
+    @if (busqueda().trim()) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="busqueda.set('')">Ver todos</button>
+    } @else {
+      <button type="button" class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+        <app-icon name="plus" [size]="15" /> Registrar cliente
+      </button>
+    }
+  </div>
+} @else {
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Documento</th>
+          <th>Celular</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (cliente of filtrados(); track cliente.id) {
+          <tr [class.is-selected]="editando()?.id === cliente.id">
+            <td>
+              <div class="client-cell">
+                <span class="client-avatar">{{ iniciales(cliente.nombres) }}</span>
+                <div class="cell-stack">
+                  <span class="cell-strong">{{ cliente.nombres }}</span>
+                  <small>Ficha #{{ cliente.id }}</small>
+                </div>
+              </div>
+            </td>
+            <td class="cell-strong">{{ cliente.numeroDocumento }}</td>
+            <td>{{ cliente.celular }}</td>
+            <td>
+              <div class="cell-actions">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="editar(cliente)">
+                  <app-icon name="edit" [size]="14" /> Editar
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  [disabled]="eliminando() === cliente.id"
+                  (click)="eliminar(cliente)">
+                  @if (eliminando() === cliente.id) {
+                    <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                  } @else {
+                    <app-icon name="trash" [size]="14" />
+                  }
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note mt-2">
+    <strong>Nota:</strong> la ficha de cliente guarda documento, nombres y celular. No almacena
+    credenciales: la autenticación la administra Keycloak. El token de sesión no incluye un
+    identificador de cliente, por lo que la vinculación se realiza desde este directorio.
+  </div>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-cliente" (click)="$event.stopPropagation()">
+      <div class="modal__head">
+        <div>
+          <span class="eyebrow" style="margin-bottom: 0.3rem;">Directorio</span>
+          <h2 id="titulo-cliente">{{ editando() ? 'Editar cliente' : 'Nuevo cliente' }}</h2>
+          <p class="tiny muted mb-0">
+            {{ editando() ? 'Actualiza los datos de contacto del cliente.' : 'La ficha se guarda en el servicio de clientes.' }}
+          </p>
+        </div>
+        <button type="button" class="icon-btn" (click)="cerrarModal()" aria-label="Cerrar formulario">
+          <app-icon name="close" [size]="20" />
+        </button>
+      </div>
+
+      <form (submit)="guardar(); $event.preventDefault()">
+        <div class="form-grid">
+          <label class="field">
+            <span>Número de documento</span>
+            <input
+              class="input"
+              type="text"
+              [value]="form().numeroDocumento"
+              (input)="cambiarTexto('numeroDocumento', $event)"
+              maxlength="20"
+              placeholder="Ej. 71234567"
+              autocomplete="off"
+              required>
+            <small>DNI, carné universitario o pasaporte.</small>
+          </label>
+
+          <label class="field">
+            <span>Nombres completos</span>
+            <input
+              class="input"
+              type="text"
+              [value]="form().nombres"
+              (input)="cambiarTexto('nombres', $event)"
+              maxlength="100"
+              placeholder="Ej. Ana Torres Quispe"
+              required>
+          </label>
+
+          <label class="field">
+            <span>Celular</span>
+            <input
+              class="input"
+              type="tel"
+              [value]="form().celular"
+              (input)="cambiarTexto('celular', $event)"
+              maxlength="20"
+              placeholder="Ej. 987654321"
+              required>
+          </label>
+
+          @if (errorForm()) {
+            <div class="alert alert-error">
+              <app-icon name="alert" [size]="17" />
+              <span>{{ errorForm() }}</span>
+            </div>
+          }
+
+          <div class="modal__actions">
+            <button type="button" class="btn btn-ghost" (click)="cerrarModal()" [disabled]="guardando()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="guardando()">
+              @if (guardando()) {
+                <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Guardando…
+              } @else {
+                <app-icon name="check" [size]="17" />
+                {{ editando() ? 'Guardar cambios' : 'Registrar cliente' }}
+              }
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+}

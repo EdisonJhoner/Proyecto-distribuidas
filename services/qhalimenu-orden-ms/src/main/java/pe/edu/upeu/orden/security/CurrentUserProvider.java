@@ -62,4 +62,28 @@ public class CurrentUserProvider {
         }
         return null;
     }
+
+    public String getNombre() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof JwtAuthenticationToken jwtToken) {
+            Jwt jwt = jwtToken.getToken();
+            if (jwt != null) {
+                String name = jwt.getClaimAsString("name");
+                if (name != null && !name.isBlank()) {
+                    return name.trim();
+                }
+                String given = jwt.getClaimAsString("given_name");
+                String family = jwt.getClaimAsString("family_name");
+                if (given != null && !given.isBlank()) {
+                    return (given + " " + (family == null ? "" : family)).trim();
+                }
+                String preferred = jwt.getClaimAsString("preferred_username");
+                if (preferred != null && !preferred.isBlank()) {
+                    return preferred.trim();
+                }
+            }
+        }
+        String username = getUsername();
+        return username == null || username.isBlank() ? "Cliente" : username;
+    }
 }

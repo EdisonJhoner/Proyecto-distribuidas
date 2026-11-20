@@ -1,25 +1,35 @@
-﻿import { APP_INITIALIZER, ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { ApplicationConfig, LOCALE_ID, provideAppInitializer, provideZonelessChangeDetection, inject } from '@angular/core';
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { registerLocaleData } from '@angular/common';
+import localeEsPe from '@angular/common/locales/es-PE';
 
 import { routes } from './app.routes';
-import { KeycloakService } from './services/keycloak.service';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './interceptors/auth.interceptor';
+import { KeycloakService } from './services/keycloak.service';
 
-function initializeKeycloak(keycloak: KeycloakService) {
-  return () => keycloak.init();
+registerLocaleData(localeEsPe, 'es-PE');
+
+/**
+ * Keycloak se inicializa antes de arrancar la aplicación para que los guards
+ * conozcan el estado real de la sesión (Authorization Code + PKCE).
+ */
+function inicializarSesion(): Promise<boolean> {
+  return inject(KeycloakService).init();
 }
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZoneChangeDetection({ eventCoalescing: true }),
-    provideRouter(routes),
+    provideZonelessChangeDetection(),
+    provideRouter(
+      routes,
+      withInMemoryScrolling({
+        anchorScrolling: 'enabled',
+        scrollPositionRestoration: 'top'
+      })
+    ),
     provideHttpClient(withInterceptors([authInterceptor])),
-    {
-      provide: APP_INITIALIZER,
-      useFactory: initializeKeycloak,
-      deps: [KeycloakService],
-      multi: true
-    }
+    provideAppInitializer(inicializarSesion),
+    { provide: LOCALE_ID, useValue: 'es-PE' }
   ]
 };

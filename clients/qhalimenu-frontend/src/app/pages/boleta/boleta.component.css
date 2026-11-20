@@ -1,0 +1,6 @@
+:host { display: block; }
+
+@media print {
+  :host { display: block; }
+  .ticket-wrap { gap: 0; }
+}

@@ -1,0 +1,205 @@
+<div class="page">
+  <div class="container">
+    <div class="toolbar no-print" style="justify-content: space-between; margin-bottom: 1.2rem;">
+      <a class="btn btn-ghost btn-sm" [routerLink]="volverRuta()">
+        <app-icon name="arrow-left" [size]="16" /> {{ volverTexto() }}
+      </a>
+      @if (orden()) {
+        <div class="toolbar">
+          <button type="button" class="btn btn-outline btn-sm" (click)="imprimir()">
+            <app-icon name="print" [size]="16" /> Imprimir / PDF
+          </button>
+        </div>
+      }
+    </div>
+
+    @if (cargando()) {
+      <div class="ticket-wrap">
+        <div class="skeleton" style="width: min(34rem, 100%); height: 32rem; border-radius: var(--qm-radius-lg);"></div>
+      </div>
+    } @else if (error()) {
+      <div class="empty-state">
+        <span class="empty-state__icon"><app-icon name="alert" [size]="26" /></span>
+        <h3>Boleta no disponible</h3>
+        <p>{{ error() }}</p>
+        <a class="btn btn-outline" [routerLink]="volverRuta()">Volver</a>
+      </div>
+    } @else if (orden(); as pedido) {
+      @if (recienCreada() && esPagada()) {
+        <div class="alert alert-success no-print" style="max-width: 34rem; margin: 0 auto 1rem;">
+          <app-icon name="check" [size]="19" />
+          <span><strong>¡Reserva confirmada!</strong> Presenta este código en caja para recoger tu almuerzo.</span>
+        </div>
+      }
+      @if (recienCreada() && esPendiente()) {
+        <div class="alert alert-warning no-print" style="max-width: 34rem; margin: 0 auto 1rem;">
+          <app-icon name="clock" [size]="19" />
+          <span><strong>Reserva registrada con pago pendiente.</strong> Completa el pago para habilitar el recojo.</span>
+        </div>
+      }
+      @if (errorPago()) {
+        <div class="alert alert-error no-print" style="max-width: 34rem; margin: 0 auto 1rem;">
+          <app-icon name="alert" [size]="19" />
+          <span>La reserva se creó, pero el pago no se completó. Puedes reintentarlo aquí abajo.</span>
+        </div>
+      }
+
+      <div class="ticket-wrap">
+        <article class="ticket">
+          <header class="ticket__head">
+            <span class="eyebrow" style="margin-bottom: 0.3rem;">Boleta digital</span>
+            <h1>QhaliMenu</h1>
+            <p>Almuerzos saludables · Servicio del día</p>
+            <div style="margin-top: 0.7rem;">
+              <app-estado-badge [etiqueta]="etiqueta(pedido.estado)" [clase]="clase(pedido.estado)" />
+            </div>
+          </header>
+
+          <dl class="ticket__meta">
+            <div>
+              <dt>Orden</dt>
+              <dd>#{{ pedido.id }}</dd>
+            </div>
+            <div>
+              <dt>Cliente</dt>
+              <dd>{{ pedido.nombreCliente || keycloak.nombre() || 'Cliente' }}</dd>
+            </div>
+            <div>
+              <dt>Creada</dt>
+              <dd>{{ fechaCreacion() }}</dd>
+            </div>
+            <div>
+              <dt>Pago</dt>
+              <dd>{{ metodo(pedido.metodoPago) }} · {{ fechaPago() }}</dd>
+            </div>
+            <div>
+              <dt>Comprobante</dt>
+              <dd>{{ pedido.tipoComprobante || 'BOLETA' }}</dd>
+            </div>
+            <div>
+              <dt>Total</dt>
+              <dd>S/ {{ pedido.total | number:'1.2-2' }}</dd>
+            </div>
+          </dl>
+
+          @if (!esCancelada()) {
+            <ol class="ticket__timeline" aria-label="Estado de la reserva">
+              <li class="ticket-step is-done">
+                <span class="ticket-step__dot"><app-icon name="check" [size]="12" /></span>
+                <span class="ticket-step__label">
+                  <strong>Reserva creada</strong>
+                  <small>Registrada en el sistema</small>
+                </span>
+              </li>
+              <li
+                class="ticket-step"
+                [class.is-done]="esPagada() || esEntregada()"
+                [class.is-current]="esPendiente()">
+                <span class="ticket-step__dot">
+                  <app-icon [name]="esPagada() || esEntregada() ? 'check' : 'clock'" [size]="12" />
+                </span>
+                <span class="ticket-step__label">
+                  <strong>Pago confirmado</strong>
+                  <small>{{ esPendiente() ? 'Pendiente en caja' : 'Cobro registrado' }}</small>
+                </span>
+              </li>
+              <li
+                class="ticket-step"
+                [class.is-done]="esEntregada()"
+                [class.is-current]="esPagada()">
+                <span class="ticket-step__dot">
+                  <app-icon [name]="esEntregada() ? 'check' : 'qr'" [size]="12" />
+                </span>
+                <span class="ticket-step__label">
+                  <strong>Recojo en caja</strong>
+                  <small>{{ esEntregada() ? 'Pedido entregado' : 'Presenta tu QR' }}</small>
+                </span>
+              </li>
+            </ol>
+          }
+
+          @if (pedido.detalles?.length) {
+            <table class="ticket__items">
+              <thead>
+                <tr>
+                  <th>Plato</th>
+                  <th>Cant.</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (detalle of pedido.detalles; track detalle.id) {
+                  <tr>
+                    <td>{{ detalle.nombreProducto || ('Producto #' + detalle.idProducto) }}</td>
+                    <td>{{ detalle.cantidad }}</td>
+                    <td>S/ {{ detalle.precioUnitario * detalle.cantidad | number:'1.2-2' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+
+          <div class="ticket__total">
+            <span>{{ esPagada() || esEntregada() ? 'Total pagado' : 'Total de la reserva' }}</span>
+            <strong>S/ {{ pedido.total | number:'1.2-2' }}</strong>
+          </div>
+
+          @if ((esPagada() || esEntregada()) && pedido.codigoRecojo) {
+            <section class="ticket__pickup">
+              <small>Código de recojo</small>
+              <span class="ticket__code">{{ pedido.codigoRecojo }}</span>
+              <img [src]="qrRecojo(pedido.codigoRecojo)" alt="Código QR de recojo">
+              <p>Presenta este código o deja que lo escaneen en caja.</p>
+            </section>
+          } @else if (esPendiente()) {
+            <div class="alert alert-warning" style="margin-top: 1.2rem; justify-content: center;">
+              <app-icon name="clock" [size]="18" />
+              <span>El código de recojo se habilita cuando el pago sea confirmado.</span>
+            </div>
+          } @else if (esCancelada()) {
+            <div class="alert alert-error" style="margin-top: 1.2rem; justify-content: center;">
+              <app-icon name="alert" [size]="18" />
+              <span>Esta reserva fue cancelada. El stock fue devuelto al catálogo.</span>
+            </div>
+          }
+
+          <p class="tiny muted text-center" style="margin: 1.2rem 0 0;">
+            Documento generado por QhaliMenu · Proyecto académico de microservicios.<br>
+            Las fotografías del menú son ilustrativas. Este comprobante no tiene validez tributaria.
+          </p>
+        </article>
+
+        @if (esPendiente()) {
+          <section class="panel no-print" style="width: min(34rem, 100%); display: grid; gap: 0.8rem;">
+            <h2 style="font-size: 1.25rem; margin: 0;">Pago pendiente</h2>
+            @if (metodoEsEfectivo()) {
+              <div class="alert alert-warning mb-0">
+                <app-icon name="cash" [size]="18" />
+                <span>
+                  Elegiste <strong>efectivo</strong>. Acércate a caja para pagar. Un administrador
+                  confirmará el cobro y se habilitará tu código de recojo.
+                </span>
+              </div>
+            } @else {
+              <p class="tiny muted mb-0">
+                La reserva conserva tu stock. Reintenta el pago con
+                <strong>{{ metodo(pedido.metodoPago) }}</strong> para generar tu código de recojo.
+              </p>
+              <button type="button" class="btn btn-primary" [disabled]="pagando()" (click)="reintentarPago()">
+                @if (pagando()) {
+                  <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                  Procesando…
+                } @else {
+                  <app-icon name="refresh" [size]="17" /> Reintentar pago con {{ metodo(pedido.metodoPago) }}
+                }
+              </button>
+            }
+            <p class="tiny muted mb-0">
+              Si el problema continúa, muestra esta boleta en caja para recibir ayuda.
+            </p>
+          </section>
+        }
+      </div>
+    }
+  </div>
+</div>

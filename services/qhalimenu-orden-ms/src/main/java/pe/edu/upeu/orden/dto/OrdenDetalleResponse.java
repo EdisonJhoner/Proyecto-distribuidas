@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 public class OrdenDetalleResponse {
     private Long id;
     private Long idProducto;
+    private String nombreProducto;
     private Integer cantidad;
     private BigDecimal precioUnitario;
 }

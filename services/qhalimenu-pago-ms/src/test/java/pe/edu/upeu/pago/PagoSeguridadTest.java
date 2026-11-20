@@ -135,6 +135,22 @@ class PagoSeguridadTest {
     }
 
     @Test
+    void confirmarBilleteraLoPuedeElCliente() throws Exception {
+        Pago pago = pagoRepository.save(Pago.builder()
+                .ordenId(321L)
+                .monto(new BigDecimal("12.00"))
+                .metodoPago("YAPE")
+                .estadoPago("PENDIENTE")
+                .fechaPago(LocalDateTime.now())
+                .build());
+
+        mockMvc.perform(post("/api/v1/pagos/orden/" + pago.getOrdenId() + "/confirmar-billetera")
+                        .with(clienteToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPago").value("PROCESADO"));
+    }
+
+    @Test
     void webhookEsPublico() throws Exception {
         mockMvc.perform(get("/api/v1/pagos/webhook"))
                 .andExpect(status().isOk());

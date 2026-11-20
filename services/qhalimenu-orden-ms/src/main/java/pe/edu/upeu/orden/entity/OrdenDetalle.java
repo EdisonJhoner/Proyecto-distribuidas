@@ -25,6 +25,9 @@ public class OrdenDetalle {
     @Column(name = "id_producto", nullable = false)
     private Long idProducto;
 
+    @Column(name = "nombre_producto", length = 150)
+    private String nombreProducto;
+
     @Column(name = "cantidad", nullable = false)
     private Integer cantidad;
 

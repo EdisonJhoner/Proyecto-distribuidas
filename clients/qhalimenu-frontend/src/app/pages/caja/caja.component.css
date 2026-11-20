@@ -1,0 +1,9 @@
+:host { display: block; }
+
+.scan-input {
+  font-family: var(--qm-font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.caja-order .detail-facts { margin-top: 0; }

@@ -58,6 +58,7 @@ function Test-PortInUse([int]$Port) {
 
 $dbPorts   = @(15432, 15434, 15436, 15438, 15440, 15442)
 $kafkaPorts = @(19092, 18085)
+$obsPorts  = @(19090, 13100, 13000)
 $appPorts  = @(18888, 18761, 18080, 8088, 8080, 8082, 8084, 8086, 4200, 18180, 19000)
 
 foreach ($p in $dbPorts) {
@@ -69,6 +70,11 @@ foreach ($p in $dbPorts) {
 foreach ($p in $kafkaPorts) {
     if (Test-PortInUse $p) {
         Write-Host ("[AVISO] Puerto Kafka {0} ya esta en uso (broker o Kafka UI). Liberalo para evitar conflictos." -f $p) -ForegroundColor Yellow
+    }
+}
+foreach ($p in $obsPorts) {
+    if (Test-PortInUse $p) {
+        Write-Host ("[AVISO] Puerto observabilidad {0} ya esta en uso (Prometheus/Loki/Grafana)." -f $p) -ForegroundColor Yellow
     }
 }
 foreach ($p in $appPorts) {
@@ -123,6 +129,16 @@ if ($keycloakReady) {
     Write-Host '    Keycloak listo en http://localhost:18180 (realm qhalimenu)' -ForegroundColor Green
 } else {
     Write-Host '[AVISO] Keycloak no respondio. Los servicios no podran validar tokens.' -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------
+# 2d) Observabilidad (Prometheus + Loki + Promtail + Grafana)
+# ---------------------------------------------------------------
+Write-Host ''
+Write-Host '==> [1d/10] Levantando observabilidad (obs\compose-dev.yml)' -ForegroundColor Green
+docker compose -f (Join-Path $Root 'obs\compose-dev.yml') up -d 2>&1 | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '[AVISO] No se pudo levantar obs (revisa puertos 19090/13100/13000).' -ForegroundColor Yellow
 }
 
 # ---------------------------------------------------------------
@@ -304,6 +320,8 @@ Write-Host ''
 Write-Host '  [1] Bases de datos (Docker)         puertos 15432/15434/15436/15438/15440/15442'
 Write-Host '      Kafka (Docker)                  broker 19092  -  Kafka UI http://localhost:18085'
 Write-Host '      Keycloak (Docker)               http://localhost:18180  (admin / admin123)'
+Write-Host '      Observabilidad (Docker)         Grafana http://localhost:13000  (admin / admin)'
+Write-Host '                                     Prometheus http://localhost:19090  Loki :13100'
 Write-Host '  [2] Config Server                   http://localhost:18888'
 Write-Host '  [3] Eureka Server                   http://localhost:18761'
 Write-Host '  [4] API Gateway                     http://localhost:18080'

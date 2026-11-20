@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: 8086
 
 spring:
@@ -41,7 +41,7 @@ spring:
       ack-mode: record
   devtools:
     restart:
-      enabled: true
+      enabled: false
     livereload:
       enabled: true
 
@@ -61,10 +61,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,refresh
+        include: health,info,metrics,prometheus,refresh
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState, db
 
 logging:
   level:

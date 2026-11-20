@@ -1,0 +1,50 @@
+:host { display: block; }
+
+.donut {
+  position: relative;
+  width: 9.5rem;
+  height: 9.5rem;
+  margin: 0.4rem auto 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(12, 42, 29, 0.06);
+}
+
+.donut::after {
+  content: '';
+  position: absolute;
+  inset: 1.7rem;
+  border-radius: 50%;
+  background: var(--qm-surface);
+}
+
+.donut__center {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  line-height: 1.1;
+}
+
+.donut__center strong {
+  font-family: var(--qm-font-display);
+  font-size: 1.5rem;
+  color: var(--qm-green-950);
+}
+
+.donut__center span {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--qm-muted);
+}
+
+code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+  background: var(--qm-surface);
+  border: 1px solid var(--qm-line);
+  font-size: 0.78rem;
+}

@@ -6,6 +6,7 @@ public record CatalogoProductoDto(
         Long id,
         String nombre,
         BigDecimal precio,
-        Boolean activo
+        Boolean activo,
+        Integer stock
 ) {
 }

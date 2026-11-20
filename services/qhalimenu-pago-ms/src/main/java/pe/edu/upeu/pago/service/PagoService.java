@@ -33,6 +33,8 @@ import java.util.UUID;
 public class PagoService {
 
     public static final String METODO_EFECTIVO = "EFECTIVO";
+    public static final String METODO_YAPE = "YAPE";
+    public static final String METODO_PLIN = "PLIN";
 
     private final PagoRepository pagoRepository;
     private final PagoMapper pagoMapper;
@@ -80,7 +82,7 @@ public class PagoService {
                 .preferenceId(preferenceId)
                 .fechaPago(LocalDateTime.now())
                 .build();
-        if (mercadoPagoProperties.usarSimulacion() && !esEfectivo(metodoPago)) {
+        if (mercadoPagoProperties.usarSimulacion() && !esEfectivo(metodoPago) && !esBilletera(metodoPago)) {
             pago.setEstadoPago("PROCESADO");
         }
         Pago guardado = pagoRepository.save(pago);
@@ -115,6 +117,16 @@ public class PagoService {
                 log.info("El pago {} de la orden {} ya está PROCESADO; se reutiliza sin crear otro",
                         existente.getId(), existente.getOrdenId());
                 return pagoMapper.toResponse(existente);
+            }
+
+            if (existente != null && esBilletera(existente.getMetodoPago())
+                    && "PENDIENTE".equals(existente.getEstadoPago())) {
+                if (existente.getPreferenceId() == null || existente.getPreferenceId().isBlank()) {
+                    existente.setPreferenceId(mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID());
+                    existente = pagoRepository.save(existente);
+                }
+                String url = urlSimulacion(existente.getPreferenceId());
+                return pagoMapper.toResponse(existente, url, url, true);
             }
 
             if (esEfectivo(metodoPago)) {
@@ -175,6 +187,24 @@ public class PagoService {
         publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
         String url = urlSimulacion(preferenceId);
         return pagoMapper.toResponse(guardado, url, url, true);
+    }
+
+    @Transactional
+    public PagoResponse confirmarBilletera(Long ordenId) {
+        Pago pago = pagoRepository.findFirstByOrdenId(ordenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pago no encontrado para la orden: " + ordenId));
+        if (!esBilletera(pago.getMetodoPago())) {
+            throw new IllegalStateException("Solo se confirman por este paso los pagos Yape o Plin");
+        }
+        if ("PROCESADO".equals(pago.getEstadoPago())) {
+            return pagoMapper.toResponse(pago);
+        }
+        String estadoAnterior = pago.getEstadoPago();
+        pago.setEstadoPago("PROCESADO");
+        pago.setFechaPago(LocalDateTime.now());
+        Pago guardado = pagoRepository.save(pago);
+        publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
+        return pagoMapper.toResponse(guardado);
     }
 
     @Transactional
@@ -339,6 +369,14 @@ public class PagoService {
 
     private boolean esEfectivo(String metodoPago) {
         return metodoPago != null && METODO_EFECTIVO.equalsIgnoreCase(metodoPago.trim());
+    }
+
+    private boolean esBilletera(String metodoPago) {
+        if (metodoPago == null) {
+            return false;
+        }
+        String valor = metodoPago.trim().toUpperCase();
+        return METODO_YAPE.equals(valor) || METODO_PLIN.equals(valor);
     }
 
     private Pago buscarOFallar(Long id) {

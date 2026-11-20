@@ -19,6 +19,10 @@ public class OrdenMapper {
                 .metodoPago(orden.getMetodoPago())
                 .momentoPago(orden.getMomentoPago())
                 .total(orden.getTotal())
+                .codigoRecojo(orden.getCodigoRecojo())
+                .nombreCliente(orden.getNombreCliente())
+                .fechaPago(orden.getFechaPago())
+                .fechaEntrega(orden.getFechaEntrega())
                 .detalles(orden.getDetalles().stream().map(this::toDetalleResponse).toList())
                 .build();
     }
@@ -27,6 +31,7 @@ public class OrdenMapper {
         return OrdenDetalleResponse.builder()
                 .id(detalle.getId())
                 .idProducto(detalle.getIdProducto())
+                .nombreProducto(detalle.getNombreProducto())
                 .cantidad(detalle.getCantidad())
                 .precioUnitario(detalle.getPrecioUnitario())
                 .build();

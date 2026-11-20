@@ -9,7 +9,7 @@ Documentación de las sesiones 6 a 9 del sistema distribuido **QhaliMenu — Res
 | 8 | Mensajería asíncrona con Apache Kafka | [sesion-08-mensajeria-kafka.md](sesion-08-mensajeria-kafka.md) |
 | 9 | Patrón SAGA coreografiado (+ Outbox y reconciliación) | [sesion-09-saga-coreografiada.md](sesion-09-saga-coreografiada.md) |
 
-Producto de Unidad I: [../u1-producto.md](../u1-producto.md). Registro Eureka (S3): [../avance-s3-eureka.md](../avance-s3-eureka.md).
+Producto de Unidad I: [../u1-producto.md](../u1-producto.md). Producto de Unidad II (S12): [../u2-producto.md](../u2-producto.md). Registro Eureka (S3): [../avance-s3-eureka.md](../avance-s3-eureka.md).
 
 ## Stack
 

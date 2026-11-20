@@ -8,7 +8,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import pe.edu.upeu.orden.entity.Orden;
+import pe.edu.upeu.orden.entity.OrdenDetalle;
 import pe.edu.upeu.orden.repository.OrdenRepository;
+import pe.edu.upeu.orden.resilience.CatalogoResiliente;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +24,7 @@ public class OrdenReconciliador {
     public static final String ESTADO_CANCELADA = "CANCELADA";
 
     private final OrdenRepository ordenRepository;
+    private final CatalogoResiliente catalogoResiliente;
 
     @Value("${qhalimenu.saga.timeout-minutos:15}")
     private long timeoutMinutos;
@@ -33,13 +36,25 @@ public class OrdenReconciliador {
     public void cancelarOrdenesEstancadas() {
         LocalDateTime limite = LocalDateTime.now().minusMinutes(timeoutMinutos);
         List<Orden> estancadas =
-                ordenRepository.findByEstadoAndFechaCreacionBefore(ESTADO_PENDIENTE_PAGO, limite);
+                ordenRepository.findByEstadoAndFechaCreacionBeforeConDetalles(ESTADO_PENDIENTE_PAGO, limite);
         if (estancadas.isEmpty()) {
             return;
         }
-        estancadas.forEach(orden -> orden.setEstado(ESTADO_CANCELADA));
+        estancadas.forEach(orden -> {
+            restaurarStock(orden);
+            orden.setEstado(ESTADO_CANCELADA);
+        });
         ordenRepository.saveAll(estancadas);
         log.warn("Reconciliación: {} orden(es) PENDIENTE_PAGO estancadas (> {} min) canceladas",
                 estancadas.size(), timeoutMinutos);
+    }
+
+    private void restaurarStock(Orden orden) {
+        if (orden.getDetalles() == null) {
+            return;
+        }
+        for (OrdenDetalle detalle : orden.getDetalles()) {
+            catalogoResiliente.restaurarStock(detalle.getIdProducto(), detalle.getCantidad());
+        }
     }
 }

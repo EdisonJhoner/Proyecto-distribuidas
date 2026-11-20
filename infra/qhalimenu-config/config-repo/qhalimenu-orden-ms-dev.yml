@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 8082
 
 spring:
@@ -20,6 +20,11 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  cloud:
+    openfeign:
+      httpclient:
+        hc5:
+          enabled: true
   kafka:
     bootstrap-servers: localhost:19092
     producer:
@@ -53,21 +58,21 @@ eureka:
 resilience4j:
   circuitbreaker:
     instances:
-      catalogo-ms:
+      catalogo:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
         permittedNumberOfCallsInHalfOpenState: 3
-      cliente-ms:
+      cliente:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
         permittedNumberOfCallsInHalfOpenState: 3
   timelimiter:
     instances:
-      catalogo-ms:
+      catalogo:
         timeoutDuration: 2s
-      cliente-ms:
+      cliente:
         timeoutDuration: 2s
 
 springdoc:
@@ -78,10 +83,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState, db
 
 logging:
   level:

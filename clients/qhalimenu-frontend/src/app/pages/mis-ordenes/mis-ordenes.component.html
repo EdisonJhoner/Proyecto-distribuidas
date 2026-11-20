@@ -1,0 +1,161 @@
+<div class="page">
+  <div class="container">
+    <div class="page-head">
+      <div>
+        <span class="eyebrow">Tu historial</span>
+        <h1>Mis reservas</h1>
+        <p>Consulta el estado de tus pedidos, tus códigos de recojo y tus boletas.</p>
+      </div>
+      <a class="btn btn-primary" routerLink="/catalogo">
+        <app-icon name="plus" [size]="17" /> Nueva reserva
+      </a>
+    </div>
+
+    @if (!cargando() && !error()) {
+      <div class="stats-grid" style="margin-bottom: 1.2rem;">
+        <article class="stat-card">
+          <span class="stat-card__icon"><app-icon name="package" [size]="19" /></span>
+          <span class="stat-card__label">Reservas totales</span>
+          <span class="stat-card__value">{{ ordenes().length }}</span>
+          <span class="stat-card__hint">Historial completo</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card__icon"><app-icon name="clock" [size]="19" /></span>
+          <span class="stat-card__label">Por recoger</span>
+          <span class="stat-card__value">{{ porRecoger() }}</span>
+          <span class="stat-card__hint">Listas en caja</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card__icon"><app-icon name="alert" [size]="19" /></span>
+          <span class="stat-card__label">Pago pendiente</span>
+          <span class="stat-card__value">{{ pendientesPago() }}</span>
+          <span class="stat-card__hint">Completa el pago</span>
+        </article>
+        <article class="stat-card stat-card--accent">
+          <span class="stat-card__icon"><app-icon name="check" [size]="19" /></span>
+          <span class="stat-card__label">Entregadas</span>
+          <span class="stat-card__value">{{ entregadas() }}</span>
+          <span class="stat-card__hint">Almuerzos recogidos</span>
+        </article>
+      </div>
+
+      <div class="chip-row" style="margin-bottom: 1.1rem;">
+        @for (opcion of filtros; track opcion.valor) {
+          <button
+            type="button"
+            class="chip"
+            [class.is-active]="filtro() === opcion.valor"
+            (click)="filtrar(opcion.valor)">
+            {{ opcion.etiqueta }}
+            <span class="chip__count">{{ conteo()[opcion.valor] }}</span>
+          </button>
+        }
+      </div>
+    }
+
+    @if (cargando()) {
+      <div class="order-list">
+        @for (n of [1, 2, 3]; track n) {
+          <div class="skeleton" style="height: 11rem; border-radius: var(--qm-radius-lg);"></div>
+        }
+      </div>
+    } @else if (error()) {
+      <div class="empty-state">
+        <span class="empty-state__icon"><app-icon name="alert" [size]="26" /></span>
+        <h3>No pudimos cargar tus reservas</h3>
+        <p>{{ error() }}</p>
+        <button type="button" class="btn btn-outline" (click)="cargar()">
+          <app-icon name="refresh" [size]="16" /> Reintentar
+        </button>
+      </div>
+    } @else if (filtradas().length === 0) {
+      <div class="empty-state">
+        <span class="empty-state__icon"><app-icon name="utensils" [size]="27" /></span>
+        <h3>
+          @if (filtro() === 'todas') { Aún no tienes reservas } @else { No hay reservas en este estado }
+        </h3>
+        <p>
+          @if (filtro() === 'todas') {
+            Explora el menú del día y reserva tu primer almuerzo.
+          } @else {
+            Prueba con otro filtro para ver tu historial.
+          }
+        </p>
+        @if (filtro() === 'todas') {
+          <a class="btn btn-primary" routerLink="/catalogo">Ver menú de hoy</a>
+        } @else {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="filtrar('todas')">Ver todas</button>
+        }
+      </div>
+    } @else {
+      <div class="order-list">
+        @for (orden of filtradas(); track orden.id) {
+          <article class="order-card">
+            <div class="order-card__head">
+              <div class="order-card__id">
+                <strong>Reserva #{{ orden.id }}</strong>
+                <small>{{ fecha(orden) }} · {{ metodo(orden.metodoPago) }}</small>
+              </div>
+              <app-estado-badge [etiqueta]="etiqueta(orden.estado)" [clase]="clase(orden.estado)" />
+            </div>
+
+            @if (orden.detalles?.length) {
+              <div class="order-card__items">
+                @for (detalle of orden.detalles; track detalle.id) {
+                  <span>
+                    <span>
+                      <strong>{{ detalle.cantidad }} ×</strong>
+                      {{ detalle.nombreProducto || ('Producto #' + detalle.idProducto) }}
+                    </span>
+                    <small>S/ {{ detalle.precioUnitario * detalle.cantidad | number:'1.2-2' }}</small>
+                  </span>
+                }
+              </div>
+            }
+
+            <div class="order-card__foot">
+              <div class="toolbar">
+                <span class="order-card__total">S/ {{ orden.total | number:'1.2-2' }}</span>
+                <span class="tiny muted">· {{ unidades(orden) }} {{ unidades(orden) === 1 ? 'unidad' : 'unidades' }}</span>
+              </div>
+
+              <div class="order-card__actions">
+                @if (orden.codigoRecojo && orden.estado !== 'CANCELADA') {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="copiarCodigo(orden.codigoRecojo)">
+                    <app-icon name="qr" [size]="15" /> {{ orden.codigoRecojo }}
+                  </button>
+                }
+                @if (orden.estado === 'PENDIENTE_PAGO') {
+                  <a class="btn btn-primary btn-sm" [routerLink]="['/boleta', orden.id]">
+                    <app-icon name="card" [size]="15" /> Completar pago
+                  </a>
+                }
+                <a class="btn btn-ghost btn-sm" [routerLink]="['/boleta', orden.id]">
+                  <app-icon name="download" [size]="15" /> Ver boleta
+                </a>
+              </div>
+            </div>
+
+            @if (orden.estado === 'PAGADA') {
+              <p class="tiny mb-0" style="color: var(--qm-success);">
+                <app-icon name="check" [size]="14" style="vertical-align: -2px;" />
+                Pago confirmado. Presenta tu código en caja para recoger.
+              </p>
+            } @else if (orden.estado === 'PENDIENTE_PAGO') {
+              <p class="tiny mb-0" style="color: var(--qm-warning);">
+                <app-icon name="clock" [size]="14" style="vertical-align: -2px;" />
+                El pedido reservó stock pero aún no registra pago. Complétalo para habilitar el recojo.
+              </p>
+            }
+          </article>
+        }
+      </div>
+
+      <div class="note" style="margin-top: 1.4rem;">
+        <strong>Cancelaciones:</strong> por políticas del servicio, solo caja o administración
+        pueden cancelar una reserva y devolver el stock. Si necesitas cancelar, acércate a caja
+        con tu código de recojo.
+      </div>
+    }
+  </div>
+</div>

@@ -13,6 +13,9 @@ Estado verificado: **2026-10-29** (todo levantado y probado en esta máquina).
 | Keycloak | <http://localhost:18180> | Consola admin: `admin` / `admin123` |
 | Keycloak health | <http://localhost:19000/health/ready> | |
 | Kafka UI | <http://localhost:18085> | Cluster `qhalimenu`, broker `19092` |
+| Grafana | <http://localhost:13000> | `admin` / `admin` (S10) |
+| Prometheus | <http://localhost:19090> | Targets: `/targets` |
+| Loki | <http://localhost:13100> | Logs vía Grafana |
 | Swagger Catálogo | <http://localhost:8080/swagger-ui.html> | |
 | Swagger Orden | <http://localhost:8082/swagger-ui.html> | |
 | Swagger Cliente | <http://localhost:8084/swagger-ui.html> | |
@@ -110,8 +113,9 @@ Para detener: `Ctrl+C` en cada ventana, o cerrar las ventanas.
 
 ## Limitaciones conocidas
 
-- **No existe stack de observabilidad** (Grafana/Prometheus/Loki/Tempo) en este
-  repositorio. No hay URL de Grafana. Lo único disponible es Kafka UI.
+- Observabilidad S10: Prometheus + Loki + Promtail + Grafana en `obs/`.
+  El tablero se arma en Grafana como en la guía del ingeniero
+  (`S10 - Diagnóstico`). No hay Tempo.
 - El realm `qhalimenu`, sus roles y usuarios se configuraron sobre la instancia
   en ejecución y persisten en el volumen Docker de Keycloak. **No hay un export
   del realm versionado en el repositorio**, así que un Keycloak desde cero

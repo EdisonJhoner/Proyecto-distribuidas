@@ -1,0 +1,190 @@
+<div class="admin-page-head">
+  <div>
+    <span class="eyebrow">Catálogo</span>
+    <h1>Gestión de categorías</h1>
+    <p>Organiza el menú en secciones para que los clientes encuentren sus platos.</p>
+  </div>
+  <div class="toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" (click)="cargar()" [disabled]="cargando()">
+      <app-icon name="refresh" [size]="15" /> Actualizar
+    </button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+      <app-icon name="plus" [size]="16" /> Nueva categoría
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="alert alert-error" style="margin-bottom: 1rem;">
+    <app-icon name="alert" [size]="18" />
+    <span>{{ error() }}</span>
+  </div>
+}
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="filter" [size]="19" /></span>
+    <span class="stat-card__label">Categorías</span>
+    <span class="stat-card__value">{{ total() }}</span>
+    <span class="stat-card__hint">Secciones del catálogo</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="utensils" [size]="19" /></span>
+    <span class="stat-card__label">Con productos</span>
+    <span class="stat-card__value">{{ conProductos() }}</span>
+    <span class="stat-card__hint">Categorías en uso</span>
+  </article>
+  <article class="stat-card stat-card--accent">
+    <span class="stat-card__icon"><app-icon name="package" [size]="19" /></span>
+    <span class="stat-card__label">Sin productos</span>
+    <span class="stat-card__value">{{ vacias() }}</span>
+    <span class="stat-card__hint">Disponibles para nuevos platos</span>
+  </article>
+</section>
+
+<div class="admin-filters">
+  <div class="search-box">
+    <app-icon name="search" [size]="17" />
+    <input
+      class="input"
+      type="search"
+      placeholder="Buscar categoría…"
+      [value]="busqueda()"
+      (input)="buscar($event)"
+      aria-label="Buscar categorías">
+  </div>
+  <span class="results-count">{{ filtradas().length }} de {{ total() }}</span>
+</div>
+
+@if (cargando()) {
+  <div class="skeleton" style="height: 16rem; border-radius: var(--qm-radius-md);"></div>
+} @else if (filtradas().length === 0) {
+  <div class="empty-state">
+    <span class="empty-state__icon"><app-icon name="filter" [size]="26" /></span>
+    <h3>{{ busqueda().trim() ? 'Sin coincidencias' : 'Aún no hay categorías' }}</h3>
+    <p>
+      @if (busqueda().trim()) {
+        No encontramos categorías con ese nombre.
+      } @else {
+        Crea la primera categoría para poder clasificar los productos del menú.
+      }
+    </p>
+    @if (!busqueda().trim()) {
+      <button type="button" class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+        <app-icon name="plus" [size]="15" /> Crear categoría
+      </button>
+    }
+  </div>
+} @else {
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Categoría</th>
+          <th>Descripción</th>
+          <th>Productos</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (categoria of filtradas(); track categoria.id) {
+          <tr [class.is-selected]="editando()?.id === categoria.id">
+            <td class="cell-strong">{{ categoria.nombre }}</td>
+            <td>{{ categoria.descripcion || 'Sin descripción registrada.' }}</td>
+            <td>
+              <span class="status-badge" [class]="totalProductos(categoria) > 0 ? 'status-badge is-done' : 'status-badge is-neutral'">
+                <span class="status-badge__dot"></span>
+                {{ totalProductos(categoria) }} {{ totalProductos(categoria) === 1 ? 'producto' : 'productos' }}
+              </span>
+            </td>
+            <td>
+              <div class="cell-actions">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="editar(categoria)">
+                  <app-icon name="edit" [size]="14" /> Editar
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  [disabled]="eliminando() === categoria.id"
+                  (click)="eliminar(categoria)">
+                  @if (eliminando() === categoria.id) {
+                    <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                  } @else {
+                    <app-icon name="trash" [size]="14" />
+                  }
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note mt-2">
+    Si una categoría tiene productos asociados, el servidor puede rechazar su eliminación.
+    En ese caso, reasigna o elimina primero los productos correspondientes.
+  </div>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-categoria" (click)="$event.stopPropagation()">
+      <div class="modal__head">
+        <div>
+          <span class="eyebrow" style="margin-bottom: 0.3rem;">Catálogo</span>
+          <h2 id="titulo-categoria">{{ editando() ? 'Editar categoría' : 'Nueva categoría' }}</h2>
+        </div>
+        <button type="button" class="icon-btn" (click)="cerrarModal()" aria-label="Cerrar formulario">
+          <app-icon name="close" [size]="20" />
+        </button>
+      </div>
+
+      <form (submit)="guardar(); $event.preventDefault()">
+        <div class="form-grid">
+          <label class="field">
+            <span>Nombre</span>
+            <input
+              class="input"
+              type="text"
+              [value]="form().nombre"
+              (input)="cambiarTexto('nombre', $event)"
+              maxlength="80"
+              placeholder="Ej. Almuerzos"
+              required>
+          </label>
+
+          <label class="field">
+            <span>Descripción</span>
+            <textarea
+              class="textarea"
+              [value]="form().descripcion"
+              (input)="cambiarTexto('descripcion', $event)"
+              maxlength="255"
+              placeholder="Describe qué platos agrupa esta categoría"></textarea>
+          </label>
+
+          @if (errorForm()) {
+            <div class="alert alert-error">
+              <app-icon name="alert" [size]="17" />
+              <span>{{ errorForm() }}</span>
+            </div>
+          }
+
+          <div class="modal__actions">
+            <button type="button" class="btn btn-ghost" (click)="cerrarModal()" [disabled]="guardando()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="guardando()">
+              @if (guardando()) {
+                <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Guardando…
+              } @else {
+                <app-icon name="check" [size]="17" />
+                {{ editando() ? 'Guardar cambios' : 'Crear categoría' }}
+              }
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -6,6 +6,7 @@ import pe.edu.upeu.orden.dto.OrdenDetalleRequest;
 import pe.edu.upeu.orden.dto.OrdenRequest;
 import pe.edu.upeu.orden.dto.OrdenResponse;
 import pe.edu.upeu.orden.entity.Orden;
+import pe.edu.upeu.orden.entity.OrdenDetalle;
 import pe.edu.upeu.orden.event.OrdenEventoPublisher;
 import pe.edu.upeu.orden.event.PagoValidadoEvento;
 import pe.edu.upeu.orden.exception.AccesoDenegadoException;
@@ -24,6 +25,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,6 +56,7 @@ class OrdenServiceTest {
         ordenService = new OrdenService(ordenRepository, new OrdenMapper(),
                 catalogoResiliente, clienteResiliente, currentUserProvider, ordenEventoPublisher);
         when(ordenRepository.save(any(Orden.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(catalogoResiliente.descontarStock(any(), any())).thenReturn(true);
     }
 
     @AfterEach
@@ -67,9 +70,9 @@ class OrdenServiceTest {
         when(clienteResiliente.validarCliente(1L))
                 .thenReturn(new ClienteDto(1L, "12345678", "Ana Perez"));
         when(catalogoResiliente.obtenerProducto(10L))
-                .thenReturn(new CatalogoProductoDto(10L, "Menu del dia", new BigDecimal("8.50"), true));
+                .thenReturn(new CatalogoProductoDto(10L, "Menu del dia", new BigDecimal("8.50"), true, 50));
         when(catalogoResiliente.obtenerProducto(11L))
-                .thenReturn(new CatalogoProductoDto(11L, "Jugo", new BigDecimal("3.00"), true));
+                .thenReturn(new CatalogoProductoDto(11L, "Jugo", new BigDecimal("3.00"), true, 50));
 
         OrdenResponse response = ordenService.crear(requestConDosDetalles(), "1");
 
@@ -80,6 +83,23 @@ class OrdenServiceTest {
         assertEquals(new BigDecimal("8.50"), response.getDetalles().get(0).getPrecioUnitario());
         verify(clienteResiliente).validarCliente(1L);
         verify(ordenEventoPublisher).publicarOrdenCreada(any(Orden.class));
+        verify(catalogoResiliente).descontarStock(10L, 2);
+        verify(catalogoResiliente).descontarStock(11L, 1);
+    }
+
+    @Test
+    void noCreaOrdenSiNoHayStock() {
+        when(currentUserProvider.getIdCliente()).thenReturn(1L);
+        when(clienteResiliente.validarCliente(1L))
+                .thenReturn(new ClienteDto(1L, "12345678", "Ana Perez"));
+        when(catalogoResiliente.obtenerProducto(10L))
+                .thenReturn(new CatalogoProductoDto(10L, "Menu del dia", new BigDecimal("8.50"), true, 0));
+        when(catalogoResiliente.descontarStock(10L, 2)).thenReturn(false);
+
+        assertThrows(NegocioException.class,
+                () -> ordenService.crear(requestConDosDetalles(), "1"));
+        verify(ordenRepository, never()).save(any(Orden.class));
+        verify(ordenEventoPublisher, never()).publicarOrdenCreada(any(Orden.class));
     }
 
     @Test
@@ -128,31 +148,158 @@ class OrdenServiceTest {
     @Test
     void aplicarResultadoPagoValidadoMarcaOrdenPagada() {
         Orden orden = Orden.builder().id(7L).idCliente("1").estado("PENDIENTE_PAGO").build();
-        when(ordenRepository.findById(7L)).thenReturn(Optional.of(orden));
+        when(ordenRepository.findByIdConDetalles(7L)).thenReturn(Optional.of(orden));
 
         ordenService.aplicarResultadoPago(
                 PagoValidadoEvento.validado(7L, 100L, "SIM-1", new BigDecimal("20.00")));
 
         assertEquals("PAGADA", orden.getEstado());
+        assertEquals(true, orden.getCodigoRecojo() != null && orden.getCodigoRecojo().startsWith("QM"));
+        assertEquals(true, orden.getFechaPago() != null);
         verify(ordenRepository).save(orden);
     }
 
     @Test
+    void entregarPorCodigoMarcaOrdenEntregada() {
+        Orden orden = Orden.builder()
+                .id(20L)
+                .idCliente("1")
+                .estado("PAGADA")
+                .codigoRecojo("QMABC123")
+                .build();
+        when(ordenRepository.findByCodigoRecojoIgnoreCase("QMABC123")).thenReturn(Optional.of(orden));
+
+        OrdenResponse response = ordenService.entregarPorCodigo("qmabc123");
+
+        assertEquals("ENTREGADA", response.getEstado());
+        assertEquals(true, orden.getFechaEntrega() != null);
+        verify(ordenRepository).save(orden);
+    }
+
+    @Test
+    void noEntregaSiLaOrdenNoEstaPagada() {
+        Orden orden = Orden.builder()
+                .id(21L)
+                .estado("PENDIENTE_PAGO")
+                .codigoRecojo("QMXYZ999")
+                .build();
+        when(ordenRepository.findByCodigoRecojoIgnoreCase("QMXYZ999")).thenReturn(Optional.of(orden));
+
+        assertThrows(NegocioException.class, () -> ordenService.entregarPorCodigo("QMXYZ999"));
+        verify(ordenRepository, never()).save(any(Orden.class));
+    }
+
+    @Test
+    void cancelarOrdenPagadaRestauraStock() {
+        OrdenDetalle detalle = OrdenDetalle.builder()
+                .idProducto(10L)
+                .cantidad(3)
+                .precioUnitario(new BigDecimal("8.50"))
+                .build();
+        Orden orden = Orden.builder()
+                .id(22L)
+                .idCliente("1")
+                .estado("PAGADA")
+                .codigoRecojo("QMCANCEL")
+                .detalles(new ArrayList<>(List.of(detalle)))
+                .build();
+        when(ordenRepository.findByIdConDetalles(22L)).thenReturn(Optional.of(orden));
+
+        OrdenResponse response = ordenService.cancelar(22L);
+
+        assertEquals("CANCELADA", response.getEstado());
+        verify(catalogoResiliente).restaurarStock(10L, 3);
+        verify(ordenRepository).save(orden);
+    }
+
+    @Test
+    void noCancelaOrdenYaEntregada() {
+        Orden orden = Orden.builder().id(23L).estado("ENTREGADA").build();
+        when(ordenRepository.findByIdConDetalles(23L)).thenReturn(Optional.of(orden));
+
+        assertThrows(NegocioException.class, () -> ordenService.cancelar(23L));
+        verify(catalogoResiliente, never()).restaurarStock(any(), any());
+    }
+
+    @Test
+    void eliminarOrdenPagadaRestauraStockYBorra() {
+        OrdenDetalle detalle = OrdenDetalle.builder()
+                .idProducto(10L)
+                .cantidad(2)
+                .precioUnitario(new BigDecimal("8.50"))
+                .build();
+        Orden orden = Orden.builder()
+                .id(30L)
+                .idCliente("1")
+                .estado("PAGADA")
+                .detalles(new ArrayList<>(List.of(detalle)))
+                .build();
+        when(ordenRepository.findByIdConDetalles(30L)).thenReturn(Optional.of(orden));
+
+        ordenService.eliminar(30L);
+
+        verify(catalogoResiliente).restaurarStock(10L, 2);
+        verify(ordenRepository).delete(orden);
+    }
+
+    @Test
+    void eliminarOrdenCanceladaNoVuelveARestaurarStock() {
+        OrdenDetalle detalle = OrdenDetalle.builder()
+                .idProducto(10L)
+                .cantidad(2)
+                .precioUnitario(new BigDecimal("8.50"))
+                .build();
+        Orden orden = Orden.builder()
+                .id(31L)
+                .estado("CANCELADA")
+                .detalles(new ArrayList<>(List.of(detalle)))
+                .build();
+        when(ordenRepository.findByIdConDetalles(31L)).thenReturn(Optional.of(orden));
+
+        ordenService.eliminar(31L);
+
+        verify(catalogoResiliente, never()).restaurarStock(any(), any());
+        verify(ordenRepository).delete(orden);
+    }
+
+    @Test
+    void cajaPuedeVerCualquierOrden() {
+        Orden ordenAjena = Orden.builder().id(24L).idCliente("9").build();
+        when(ordenRepository.findByIdConDetalles(24L)).thenReturn(Optional.of(ordenAjena));
+
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(
+                "caja1", null, List.of(new SimpleGrantedAuthority("ROLE_CAJA"))));
+
+        assertEquals(24L, ordenService.obtener(24L).getId());
+    }
+
+    @Test
     void aplicarResultadoPagoFallidoCancelaOrden() {
-        Orden orden = Orden.builder().id(8L).idCliente("1").estado("PENDIENTE_PAGO").build();
-        when(ordenRepository.findById(8L)).thenReturn(Optional.of(orden));
+        OrdenDetalle detalle = OrdenDetalle.builder()
+                .idProducto(10L)
+                .cantidad(2)
+                .precioUnitario(new BigDecimal("8.50"))
+                .build();
+        Orden orden = Orden.builder()
+                .id(8L)
+                .idCliente("1")
+                .estado("PENDIENTE_PAGO")
+                .detalles(new ArrayList<>(List.of(detalle)))
+                .build();
+        when(ordenRepository.findByIdConDetalles(8L)).thenReturn(Optional.of(orden));
 
         ordenService.aplicarResultadoPago(
                 PagoValidadoEvento.fallido(8L, 101L, "SIM-2", new BigDecimal("20.00")));
 
         assertEquals("CANCELADA", orden.getEstado());
         verify(ordenRepository).save(orden);
+        verify(catalogoResiliente).restaurarStock(10L, 2);
     }
 
     @Test
     void aplicarResultadoPagoEsIdempotenteSiYaEstaPagada() {
         Orden orden = Orden.builder().id(9L).idCliente("1").estado("PAGADA").build();
-        when(ordenRepository.findById(9L)).thenReturn(Optional.of(orden));
+        when(ordenRepository.findByIdConDetalles(9L)).thenReturn(Optional.of(orden));
 
         ordenService.aplicarResultadoPago(
                 PagoValidadoEvento.validado(9L, 102L, "SIM-3", new BigDecimal("20.00")));
@@ -164,7 +311,7 @@ class OrdenServiceTest {
     @Test
     void unPagoFallidoTardioNoCancelaUnaOrdenYaPagada() {
         Orden orden = Orden.builder().id(10L).idCliente("1").estado("PAGADA").build();
-        when(ordenRepository.findById(10L)).thenReturn(Optional.of(orden));
+        when(ordenRepository.findByIdConDetalles(10L)).thenReturn(Optional.of(orden));
 
         ordenService.aplicarResultadoPago(
                 PagoValidadoEvento.fallido(10L, 103L, "SIM-4", new BigDecimal("20.00")));

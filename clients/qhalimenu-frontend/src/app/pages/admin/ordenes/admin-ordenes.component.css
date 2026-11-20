@@ -1,0 +1,7 @@
+:host { display: block; }
+
+.cell-actions { justify-content: flex-end; }
+
+@media (max-width: 720px) {
+  .cell-actions { flex-wrap: wrap; }
+}

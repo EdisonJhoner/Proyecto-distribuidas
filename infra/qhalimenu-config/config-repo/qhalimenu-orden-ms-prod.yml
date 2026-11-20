@@ -19,6 +19,9 @@ spring:
     locations: classpath:db/migration
   cloud:
     openfeign:
+      httpclient:
+        hc5:
+          enabled: true
       client:
         config:
           default:

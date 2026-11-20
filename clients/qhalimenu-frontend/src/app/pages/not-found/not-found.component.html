@@ -1,0 +1,36 @@
+<main class="not-found">
+  <div class="not-found__glow" aria-hidden="true"></div>
+  <div class="not-found__inner">
+    <app-logo />
+
+    <span class="not-found__code">404</span>
+    <h1>Esta página no está en el menú</h1>
+    <p>
+      La dirección que abriste no existe o cambió de lugar. Puedes volver al menú del día,
+      revisar tus reservas o iniciar sesión con tu cuenta institucional.
+    </p>
+
+    <div class="not-found__actions">
+      <a class="btn btn-primary" routerLink="/catalogo">
+        <app-icon name="utensils" [size]="17" /> Ver menú de hoy
+      </a>
+      <a class="btn btn-outline" routerLink="/">
+        <app-icon name="home" [size]="17" /> Ir al inicio
+      </a>
+      @if (keycloak.autenticado()) {
+        <a class="btn btn-ghost" [routerLink]="keycloak.rutaInicio()">
+          <app-icon name="user" [size]="17" /> Mi panel
+        </a>
+      } @else {
+        <a class="btn btn-ghost" routerLink="/login">
+          <app-icon name="lock" [size]="17" /> Iniciar sesión
+        </a>
+      }
+    </div>
+
+    <div class="not-found__note">
+      <app-icon name="info" [size]="15" />
+      <span>Si llegaste desde un enlace de la aplicación, avisa al equipo para revisarlo.</span>
+    </div>
+  </div>
+</main>

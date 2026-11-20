@@ -25,6 +25,9 @@ public class OrdenRequest {
     @Size(max = 20)
     private String momentoPago;
 
+    @Size(max = 120)
+    private String nombreCliente;
+
     @NotEmpty
     @Valid
     private List<OrdenDetalleRequest> detalles;

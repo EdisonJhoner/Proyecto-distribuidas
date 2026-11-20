@@ -43,4 +43,14 @@ public class ProductoController {
     public void eliminar(@PathVariable Long id) {
         productoService.eliminar(id);
     }
+
+    @PatchMapping("/{id}/descontar-stock")
+    public void descontarStock(@PathVariable Long id, @RequestParam Integer cantidad) {
+        productoService.descontarStock(id, cantidad);
+    }
+
+    @PatchMapping("/{id}/restaurar-stock")
+    public void restaurarStock(@PathVariable Long id, @RequestParam Integer cantidad) {
+        productoService.restaurarStock(id, cantidad);
+    }
 }

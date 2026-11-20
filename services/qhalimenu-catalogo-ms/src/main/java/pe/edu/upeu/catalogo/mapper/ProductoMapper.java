@@ -18,6 +18,7 @@ public class ProductoMapper {
                 .descripcion(request.getDescripcion())
                 .precio(request.getPrecio())
                 .activo(request.getActivo())
+                .stock(request.getStock() == null ? 0 : request.getStock())
                 .build();
     }
 
@@ -28,6 +29,7 @@ public class ProductoMapper {
                 .descripcion(producto.getDescripcion())
                 .precio(producto.getPrecio())
                 .activo(producto.getActivo())
+                .stock(producto.getStock())
                 .categoria(categoriaMapper.toResponse(producto.getCategoria()))
                 .build();
     }

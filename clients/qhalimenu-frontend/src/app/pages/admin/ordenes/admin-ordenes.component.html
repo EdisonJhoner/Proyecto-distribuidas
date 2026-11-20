@@ -1,0 +1,210 @@
+<div class="admin-page-head">
+  <div>
+    <span class="eyebrow">Operación</span>
+    <h1>Gestión de órdenes</h1>
+    <p>Consulta todas las reservas, entrega pedidos pagados y administra cancelaciones.</p>
+  </div>
+  <div class="toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" (click)="cargar()" [disabled]="cargando()">
+      <app-icon name="refresh" [size]="15" /> Actualizar
+    </button>
+    <button type="button" class="btn btn-outline btn-sm" (click)="cierreDia()" [disabled]="cerrando()">
+      @if (cerrando()) {
+        <span class="spinner spinner--sm"></span> Procesando…
+      } @else {
+        <app-icon name="calendar" [size]="15" /> Cierre del día
+      }
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="alert alert-error" style="margin-bottom: 1rem;">
+    <app-icon name="alert" [size]="18" />
+    <span>{{ error() }}</span>
+  </div>
+}
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="package" [size]="19" /></span>
+    <span class="stat-card__label">Órdenes totales</span>
+    <span class="stat-card__value">{{ total() }}</span>
+    <span class="stat-card__hint">{{ hoy() }} creadas hoy</span>
+  </article>
+  <article class="stat-card stat-card--accent">
+    <span class="stat-card__icon"><app-icon name="cash" [size]="19" /></span>
+    <span class="stat-card__label">Ventas confirmadas</span>
+    <span class="stat-card__value">S/ {{ ingresos() | number:'1.2-2' }}</span>
+    <span class="stat-card__hint">Órdenes pagadas o entregadas</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="clock" [size]="19" /></span>
+    <span class="stat-card__label">Por recoger</span>
+    <span class="stat-card__value">{{ porRecoger() }}</span>
+    <span class="stat-card__hint">Pagadas esperando entrega</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-card__icon"><app-icon name="alert" [size]="19" /></span>
+    <span class="stat-card__label">Pago pendiente</span>
+    <span class="stat-card__value">{{ pendientesPago() }}</span>
+    <span class="stat-card__hint">Requieren confirmación de cobro</span>
+  </article>
+</section>
+
+<div class="chip-row" style="margin-bottom: 1rem;">
+  @for (filtro of filtros; track filtro.valor) {
+    <button
+      type="button"
+      class="chip"
+      [class.is-active]="estado() === filtro.valor"
+      (click)="filtrarEstado(filtro.valor)">
+      {{ filtro.etiqueta }}
+      <span class="chip__count">{{ conteo()[filtro.valor] }}</span>
+    </button>
+  }
+</div>
+
+<div class="admin-filters">
+  <div class="search-box">
+    <app-icon name="search" [size]="17" />
+    <input
+      class="input"
+      type="search"
+      placeholder="Buscar por #orden, cliente, código o método…"
+      [value]="busqueda()"
+      (input)="buscar($event)"
+      aria-label="Buscar órdenes">
+  </div>
+  <select class="select" (change)="cambiarPeriodo($event)" aria-label="Filtrar por periodo">
+    <option value="todas" [selected]="periodo() === 'todas'">Todo el historial</option>
+    <option value="hoy" [selected]="periodo() === 'hoy'">Solo hoy</option>
+    <option value="semana" [selected]="periodo() === 'semana'">Últimos 7 días</option>
+  </select>
+  <button type="button" class="btn btn-ghost btn-sm" (click)="limpiarFiltros()">
+    <app-icon name="close" [size]="14" /> Limpiar
+  </button>
+</div>
+
+@if (cargando()) {
+  <div class="skeleton" style="height: 22rem; border-radius: var(--qm-radius-md);"></div>
+} @else if (filtradas().length === 0) {
+  <div class="empty-state">
+    <span class="empty-state__icon"><app-icon name="package" [size]="26" /></span>
+    <h3>Sin órdenes para mostrar</h3>
+    <p>
+      @if (total() === 0) {
+        Aún no hay reservas registradas en el sistema.
+      } @else {
+        Ninguna orden coincide con los filtros seleccionados.
+      }
+    </p>
+    @if (total() > 0) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Ver todas las órdenes</button>
+    }
+  </div>
+} @else {
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Orden</th>
+          <th>Cliente</th>
+          <th>Estado</th>
+          <th>Pago</th>
+          <th>Total</th>
+          <th>Creada</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (orden of visibles(); track orden.id) {
+          <tr>
+            <td>
+              <div class="cell-stack">
+                <span class="cell-strong">#{{ orden.id }}</span>
+                <small>{{ orden.codigoRecojo || 'Sin código' }} · {{ unidades(orden) }} u.</small>
+              </div>
+            </td>
+            <td>
+              <div class="cell-stack">
+                <span>{{ orden.nombreCliente || 'Cliente' }}</span>
+                <small>{{ orden.tipoComprobante }}</small>
+              </div>
+            </td>
+            <td><app-estado-badge [etiqueta]="etiqueta(orden.estado)" [clase]="clase(orden.estado)" /></td>
+            <td>{{ metodo(orden.metodoPago) }}</td>
+            <td class="cell-strong">S/ {{ orden.total | number:'1.2-2' }}</td>
+            <td>{{ fecha(orden) }}</td>
+            <td>
+              <div class="cell-actions">
+                <a class="btn btn-ghost btn-sm" [routerLink]="['/boleta', orden.id]" title="Ver boleta">
+                  <app-icon name="eye" [size]="14" /> Boleta
+                </a>
+
+                @if (orden.estado === 'PAGADA') {
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    [disabled]="procesando() !== null"
+                    (click)="entregar(orden)">
+                    @if (procesando() === 'entregar-' + orden.id) {
+                      <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                    } @else {
+                      <app-icon name="check" [size]="14" />
+                    }
+                    Entregar
+                  </button>
+                }
+
+                @if (orden.estado === 'PENDIENTE_PAGO' || orden.estado === 'PAGADA') {
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    [disabled]="procesando() !== null"
+                    (click)="cancelar(orden)">
+                    @if (procesando() === 'cancelar-' + orden.id) {
+                      <span class="spinner spinner--sm"></span>
+                    } @else {
+                      <app-icon name="close" [size]="14" />
+                    }
+                    Cancelar
+                  </button>
+                }
+
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  [disabled]="procesando() !== null"
+                  (click)="eliminar(orden)"
+                  title="Eliminar orden">
+                  @if (procesando() === 'eliminar-' + orden.id) {
+                    <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+                  } @else {
+                    <app-icon name="trash" [size]="14" />
+                  }
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="toolbar" style="justify-content: space-between; margin-top: 0.9rem;">
+    <span class="results-count">Mostrando {{ visibles().length }} de {{ filtradas().length }} órdenes</span>
+    @if (hayMas()) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="mostrarMas()">
+        <app-icon name="chevron-down" [size]="15" /> Mostrar más
+      </button>
+    }
+  </div>
+
+  <div class="note mt-2">
+    <strong>Reglas del backend:</strong> una orden solo puede entregarse cuando está <strong>PAGADA</strong>.
+    Cancelar devuelve el stock al catálogo. La eliminación es definitiva y también restituye stock
+    cuando corresponde. El cierre del día lo ejecuta únicamente el rol ADMIN.
+  </div>
+}

@@ -24,5 +24,9 @@ public class OrdenResponse {
     private String metodoPago;
     private String momentoPago;
     private BigDecimal total;
+    private String codigoRecojo;
+    private String nombreCliente;
+    private LocalDateTime fechaPago;
+    private LocalDateTime fechaEntrega;
     private List<OrdenDetalleResponse> detalles;
 }

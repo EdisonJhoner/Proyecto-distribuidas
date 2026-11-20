@@ -27,7 +27,7 @@ public class PagoSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/info", "/swagger-ui/**",
+                        .requestMatchers("/actuator/**", "/swagger-ui/**",
                                 "/swagger-ui.html", "/v3/api-docs/**")
                         .permitAll()
                         .requestMatchers("/saludo").permitAll()
@@ -37,6 +37,8 @@ public class PagoSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/pagos").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/pagos/orden/**").hasAnyRole("CLIENTE", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/pagos/crear-preferencia")
+                        .hasAnyRole("CLIENTE", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/pagos/orden/*/confirmar-billetera")
                         .hasAnyRole("CLIENTE", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/pagos/*/confirmar").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/pagos/**").hasRole("ADMIN")

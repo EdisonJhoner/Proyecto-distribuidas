@@ -66,6 +66,11 @@ public class PagoController {
         return pagoService.confirmarPago(id);
     }
 
+    @PostMapping("/orden/{ordenId}/confirmar-billetera")
+    public PagoResponse confirmarBilletera(@PathVariable Long ordenId) {
+        return pagoService.confirmarBilletera(ordenId);
+    }
+
     @PostMapping("/crear-preferencia")
     public ResponseEntity<PagoResponse> crearPreferencia(@RequestBody(required = false) PagoRequest request) {
         try {

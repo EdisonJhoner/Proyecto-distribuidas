@@ -21,7 +21,10 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -55,7 +58,7 @@ class CatalogoResilienteTest {
     @Test
     void devuelveProductoCuandoCatalogResponde() {
         when(catalogoClient.obtener(10L))
-                .thenReturn(new CatalogoProductoDto(10L, "Menú del día", new BigDecimal("8.50"), true));
+                .thenReturn(new CatalogoProductoDto(10L, "Menú del día", new BigDecimal("8.50"), true, 50));
 
         CatalogoProductoDto producto = catalogoResiliente.obtenerProducto(10L);
 
@@ -74,7 +77,7 @@ class CatalogoResilienteTest {
     @Test
     void productoInactivoSeRechaza() {
         when(catalogoClient.obtener(11L))
-                .thenReturn(new CatalogoProductoDto(11L, "Jugo", new BigDecimal("3.00"), false));
+                .thenReturn(new CatalogoProductoDto(11L, "Jugo", new BigDecimal("3.00"), false, 10));
 
         assertThrows(ProductoNoEncontradoException.class,
                 () -> catalogoResiliente.obtenerProducto(11L));
@@ -100,6 +103,26 @@ class CatalogoResilienteTest {
         assertThrows(ServicioNoDisponibleException.class,
                 () -> catalogoResiliente.obtenerProducto(13L));
         verify(catalogoClient, times(2)).obtener(13L);
+    }
+
+    @Test
+    void descontarStockDevuelveTrueCuandoCatalogoResponde() {
+        assertTrue(catalogoResiliente.descontarStock(10L, 2));
+        verify(catalogoClient).descontarStock(10L, 2);
+    }
+
+    @Test
+    void descontarStockDevuelveFalseCuandoCatalogoFalla() {
+        doThrow(new RuntimeException("connection refused")).when(catalogoClient).descontarStock(11L, 1);
+
+        assertFalse(catalogoResiliente.descontarStock(11L, 1));
+    }
+
+    @Test
+    void restaurarStockNoRelanzaSiCatalogoFalla() {
+        doThrow(new RuntimeException("connection refused")).when(catalogoClient).restaurarStock(11L, 1);
+
+        catalogoResiliente.restaurarStock(11L, 1);
     }
 
     private FeignException notFound() {

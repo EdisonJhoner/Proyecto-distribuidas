@@ -1,0 +1,249 @@
+<div class="admin-page-head">
+  <div>
+    <span class="eyebrow">Panel administrativo</span>
+    <h1>Resumen general</h1>
+    <p>Indicadores calculados en vivo desde órdenes, pagos y clientes · {{ hoy() }}</p>
+  </div>
+  <div class="toolbar">
+    <a class="btn btn-ghost btn-sm" routerLink="/catalogo" target="_blank" rel="noopener">
+      <app-icon name="external" [size]="15" /> Ver sitio
+    </a>
+    <button type="button" class="btn btn-primary btn-sm" (click)="cargar()" [disabled]="cargando()">
+      @if (cargando()) {
+        <span class="spinner spinner--sm" style="border-top-color: #fff;"></span> Actualizando…
+      } @else {
+        <app-icon name="refresh" [size]="15" /> Actualizar datos
+      }
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="alert alert-warning" style="margin-bottom: 1rem;">
+    <app-icon name="alert" [size]="18" />
+    <span>{{ error() }}</span>
+  </div>
+}
+
+@if (cargando()) {
+  <div class="stats-grid">
+    @for (n of [1, 2, 3, 4]; track n) {
+      <div class="skeleton" style="height: 8.4rem;"></div>
+    }
+  </div>
+  <div class="dashboard-grid">
+    <div class="skeleton" style="height: 22rem;"></div>
+    <div class="skeleton" style="height: 22rem;"></div>
+  </div>
+} @else {
+  <section class="stats-grid">
+    <article class="stat-card stat-card--accent">
+      <span class="stat-card__icon"><app-icon name="chart" [size]="19" /></span>
+      <span class="stat-card__label">Ingresos confirmados</span>
+      <span class="stat-card__value">S/ {{ ingresos() | number:'1.2-2' }}</span>
+      <span class="stat-card__hint">{{ pagosProcesados().length }} pagos procesados</span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon"><app-icon name="package" [size]="19" /></span>
+      <span class="stat-card__label">Reservas totales</span>
+      <span class="stat-card__value">{{ totalOrdenes() }}</span>
+      <span class="stat-card__hint">{{ ordenesHoy() }} creadas hoy · {{ ventasHoy() | number:'1.2-2' }} en ventas hoy</span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon"><app-icon name="clock" [size]="19" /></span>
+      <span class="stat-card__label">Por recoger</span>
+      <span class="stat-card__value">{{ porRecoger().length }}</span>
+      <span class="stat-card__hint">Pagadas esperando entrega</span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__icon"><app-icon name="users" [size]="19" /></span>
+      <span class="stat-card__label">Clientes registrados</span>
+      <span class="stat-card__value">{{ clientes().length }}</span>
+      <span class="stat-card__hint">Directorio del servicio de clientes</span>
+    </article>
+  </section>
+
+  <div class="dashboard-grid">
+    <div style="display: grid; gap: 1rem;">
+      <section class="card chart-card">
+        <div class="chart-card__head">
+          <div>
+            <h2>Reservas de los últimos 7 días</h2>
+            <p class="tiny muted mb-0">Cantidad de órdenes creadas por día (incluye todos los estados).</p>
+          </div>
+          <span class="status-badge is-neutral"><app-icon name="calendar" [size]="13" /> 7 días</span>
+        </div>
+
+        <div class="bar-chart" role="img" aria-label="Reservas creadas por día en los últimos siete días">
+          @for (barra of barras(); track barra.clave) {
+            <div class="bar-chart__col" [title]="barra.ordenes + ' reservas · S/ ' + (barra.monto | number:'1.2-2')">
+              <span class="bar-chart__value">{{ barra.ordenes }}</span>
+              <div class="bar-chart__bar" [class.is-muted]="barra.ordenes === 0" [style.height]="alturaBarra(barra.ordenes)"></div>
+              <span class="bar-chart__label">{{ barra.etiqueta }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="toolbar" style="justify-content: space-between; margin-top: 0.8rem;">
+          <span class="tiny muted">Ticket promedio: <strong>S/ {{ ticketPromedio() | number:'1.2-2' }}</strong></span>
+          <span class="tiny muted">{{ canceladas() }} canceladas en total</span>
+        </div>
+      </section>
+
+      <section class="card chart-card">
+        <div class="chart-card__head">
+          <div>
+            <h2>Órdenes recientes</h2>
+            <p class="tiny muted mb-0">Últimos movimientos registrados en el servicio de órdenes.</p>
+          </div>
+          <a class="btn-link" routerLink="/admin/ordenes">Ver todas <app-icon name="arrow-right" [size]="14" /></a>
+        </div>
+
+        @if (recientes().length === 0) {
+          <div class="empty-state" style="border: 0; background: transparent; padding: 1.5rem 1rem;">
+            <span class="empty-state__icon"><app-icon name="package" [size]="24" /></span>
+            <h3>Aún no hay órdenes</h3>
+            <p>Cuando los clientes reserven, aparecerán aquí.</p>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Orden</th>
+                  <th>Cliente</th>
+                  <th>Estado</th>
+                  <th>Total</th>
+                  <th>Fecha</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (orden of recientes(); track orden.id) {
+                  <tr>
+                    <td class="cell-strong">#{{ orden.id }}</td>
+                    <td>
+                      <div class="cell-stack">
+                        <span>{{ orden.nombreCliente || 'Cliente' }}</span>
+                        <small>{{ orden.metodoPago }}</small>
+                      </div>
+                    </td>
+                    <td><app-estado-badge [etiqueta]="etiqueta(orden.estado)" [clase]="clase(orden.estado)" /></td>
+                    <td class="cell-strong">S/ {{ orden.total | number:'1.2-2' }}</td>
+                    <td>{{ fecha(orden) }}</td>
+                    <td>
+                      <div class="cell-actions">
+                        <a class="btn btn-ghost btn-sm" [routerLink]="['/boleta', orden.id]">
+                          <app-icon name="eye" [size]="14" /> Boleta
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    </div>
+
+    <div style="display: grid; gap: 1rem;">
+      <section class="card chart-card">
+        <div class="chart-card__head">
+          <h2>Métodos de pago</h2>
+          <span class="tiny muted">{{ totalMetodos() }} órdenes</span>
+        </div>
+
+        @if (totalMetodos() === 0) {
+          <div class="empty-state" style="border: 0; background: transparent; padding: 1.4rem 1rem;">
+            <p class="tiny muted mb-0">Sin órdenes registradas.</p>
+          </div>
+        } @else {
+          <div class="donut" [style.background]="donut()" role="img" aria-label="Distribución de órdenes por método de pago">
+            <div class="donut__center">
+              <strong>{{ totalMetodos() }}</strong>
+              <span>órdenes</span>
+            </div>
+          </div>
+          <div class="donut-legend">
+            @for (item of metodos(); track item.metodo) {
+              <div class="donut-legend__item">
+                <span class="donut-legend__dot" [style.background]="item.color"></span>
+                <span>{{ item.etiqueta }}</span>
+                <span class="tiny muted">{{ porcentajeMetodo(item.cantidad) }}%</span>
+                <strong>{{ item.cantidad }}</strong>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="card chart-card">
+        <div class="chart-card__head">
+          <h2>Platos más pedidos</h2>
+          <span class="tiny muted">Top 5</span>
+        </div>
+
+        @if (topProductos().length === 0) {
+          <div class="empty-state" style="border: 0; background: transparent; padding: 1.4rem 1rem;">
+            <p class="tiny muted mb-0">Aún no hay detalles de pedidos para rankear.</p>
+          </div>
+        } @else {
+          <div class="rank-list">
+            @for (item of topProductos(); track item.nombre) {
+              <div class="rank-item">
+                <span class="rank-item__name">{{ item.nombre }}</span>
+                <span class="rank-item__value">{{ item.unidades }} u. · S/ {{ item.monto | number:'1.2-2' }}</span>
+                <span class="rank-item__bar">
+                  <span [style.width]="alturaProducto(item.unidades)"></span>
+                </span>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="card chart-card">
+        <div class="chart-card__head">
+          <h2>Requieren atención</h2>
+          <span class="status-badge is-pending">
+            <span class="status-badge__dot"></span> {{ pendientesPago().length + porRecoger().length }}
+          </span>
+        </div>
+
+        @if (atencion().length === 0) {
+          <div class="alert alert-success mb-0">
+            <app-icon name="check" [size]="18" />
+            <span>Todo al día: no hay pagos pendientes ni entregas en cola.</span>
+          </div>
+        } @else {
+          <div class="inline-list">
+            @for (orden of atencion(); track orden.id) {
+              <div class="inline-item">
+                <span class="stat-card__icon" style="width: 2rem; height: 2rem; margin: 0;">
+                  <app-icon [name]="orden.estado === 'PAGADA' ? 'package' : 'cash'" [size]="16" />
+                </span>
+                <div class="inline-item__body">
+                  <strong>#{{ orden.id }} · {{ orden.nombreCliente || 'Cliente' }}</strong>
+                  <small>
+                    {{ etiqueta(orden.estado) }} · S/ {{ orden.total | number:'1.2-2' }}
+                  </small>
+                </div>
+                <div class="inline-item__actions">
+                  <a class="btn btn-ghost btn-sm" [routerLink]="['/boleta', orden.id]">Abrir</a>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    </div>
+  </div>
+
+  <div class="note mt-3">
+    <strong>Cómo se calculan estos indicadores:</strong> no existe un endpoint de estadísticas en el
+    backend. Los valores se derivan en el navegador desde <code>GET /ordenes</code>,
+    <code>GET /pagos</code> y <code>GET /clientes</code> con la sesión de administrador. Los ingresos
+    consideran únicamente pagos en estado <strong>PROCESADO</strong>.
+  </div>
+}

@@ -1,0 +1,207 @@
+<section class="hero">
+  <div class="container hero__grid">
+    <div class="hero__copy">
+      <span class="eyebrow">Cocina saludable · recojo express</span>
+      <h1>Almuerza bien,<br><em>sin perder tiempo</em>.</h1>
+      <p class="lead">
+        Reserva tu menú del día en minutos, paga como prefieras y recoge con tu
+        boleta digital. Comida rica, fresca y lista cuando llegas.
+      </p>
+
+      <div class="hero__actions">
+        <a class="btn btn-primary btn-lg" routerLink="/catalogo">
+          Ver menú de hoy
+          <app-icon name="arrow-right" [size]="18" />
+        </a>
+        <a class="btn btn-ghost btn-lg" routerLink="/" fragment="como-funciona">
+          Cómo funciona
+        </a>
+      </div>
+
+      <div class="hero__trust">
+        @if (cargando()) {
+          <span class="hero__live is-loading">
+            <span class="hero__live-dot"></span> Consultando
+          </span>
+          <p>
+            <strong>Cargando disponibilidad</strong>
+            <small>consultando stock en tiempo real</small>
+          </p>
+        } @else if (error()) {
+          <span class="hero__live is-offline">
+            <app-icon name="alert" [size]="15" /> Sin conexión
+          </span>
+          <p>
+            <strong>No pudimos consultar el menú</strong>
+            <small>abre el catálogo para reintentar</small>
+          </p>
+        } @else {
+          <span class="hero__live">
+            <span class="hero__live-dot"></span> En vivo
+          </span>
+          <p>
+            <strong>{{ disponibles().length }} platos disponibles hoy</strong>
+            @if (totalCategorias() > 0) {
+              <small>
+                en {{ totalCategorias() }} categorías · desde
+                S/ {{ precioDesde() | number:'1.2-2' }}
+              </small>
+            } @else {
+              <small>consulta el catálogo en tiempo real</small>
+            }
+          </p>
+        }
+      </div>
+    </div>
+
+    <div class="hero__media">
+      <app-icon class="hero__leaf" name="leaf" [size]="300" />
+      <div class="hero__media-main">
+        <img
+          [src]="hero"
+          alt="Bowl saludable con vegetales frescos, granos y proteína"
+          (error)="alFallarImagen($event)">
+      </div>
+      <div class="hero__badge hero__badge--top">
+        <span class="hero__badge-icon"><app-icon name="clock" [size]="18" /></span>
+        <span>
+          <strong>Reserva en 2 min</strong>
+          <small>sin llamadas ni filas</small>
+        </span>
+      </div>
+      <div class="hero__badge hero__badge--bottom">
+        <span class="hero__badge-icon"><app-icon name="qr" [size]="18" /></span>
+        <span>
+          <strong>Recojo con QR</strong>
+          <small>boleta digital en tu perfil</small>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true">
+  <div class="marquee__track">
+    @for (item of [
+      'Ingredientes frescos', 'Pago seguro con Keycloak', 'Recojo con QR',
+      'Stock en tiempo real', 'Tarjeta · Yape · Plin · Efectivo', 'Sin filas',
+      'Ingredientes frescos', 'Pago seguro con Keycloak', 'Recojo con QR',
+      'Stock en tiempo real', 'Tarjeta · Yape · Plin · Efectivo', 'Sin filas'
+    ]; track $index) {
+      <span class="marquee__item">{{ item }}</span>
+    }
+  </div>
+</div>
+
+<section class="section" id="como-funciona">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Así de simple</span>
+        <h2 class="section-title">Tu almuerzo en tres pasos</h2>
+        <p class="lead">Del antojo al plato servido, sin complicaciones.</p>
+      </div>
+      <a class="btn btn-ghost" routerLink="/catalogo">Empezar ahora <app-icon name="arrow-right" [size]="16" /></a>
+    </div>
+
+    <div class="steps">
+      @for (paso of pasos; track paso.titulo; let i = $index) {
+        <article class="step-card">
+          <span class="step-card__num">0{{ i + 1 }}</span>
+          <span class="step-card__icon"><app-icon [name]="paso.icono" [size]="22" /></span>
+          <h3>{{ paso.titulo }}</h3>
+          <p>{{ paso.texto }}</p>
+        </article>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0;">
+  <div class="container featured">
+    <div class="featured__intro">
+      <span class="eyebrow">Menú del día</span>
+      <h2>Recién preparado,<br>listo para ti.</h2>
+      <p class="lead">
+        Estos son algunos platos disponibles ahora mismo en el catálogo.
+        La disponibilidad y el precio provienen del servicio de catálogo.
+      </p>
+      <a class="btn btn-primary" routerLink="/catalogo">Ver todo el menú</a>
+    </div>
+
+    <div>
+      @if (cargando()) {
+        <div class="featured__grid">
+          @for (n of [1, 2, 3]; track n) {
+            <div class="skeleton skeleton-card"></div>
+          }
+        </div>
+      } @else if (error()) {
+        <div class="empty-state">
+          <span class="empty-state__icon"><app-icon name="alert" [size]="24" /></span>
+          <h3>No pudimos cargar el menú</h3>
+          <p>El servicio de catálogo no respondió. Verifica que el API Gateway esté en ejecución.</p>
+          <button type="button" class="btn btn-outline btn-sm" (click)="cargar()">
+            <app-icon name="refresh" [size]="15" /> Reintentar
+          </button>
+        </div>
+      } @else if (destacados().length === 0) {
+        <div class="empty-state">
+          <span class="empty-state__icon"><app-icon name="utensils" [size]="24" /></span>
+          <h3>Aún no hay platos publicados</h3>
+          <p>Cuando el administrador cargue el menú del día, aparecerá aquí automáticamente.</p>
+        </div>
+      } @else {
+        <div class="featured__grid">
+          @for (producto of destacados(); track producto.id; let i = $index) {
+            <app-producto-card [producto]="producto" [indice]="i" />
+          }
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="section" id="beneficios" style="padding-top: 0;">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">La diferencia Qhali</span>
+        <h2 class="section-title">Pensado para tu día a día</h2>
+      </div>
+    </div>
+    <div class="benefits">
+      @for (beneficio of beneficios; track beneficio.titulo) {
+        <article class="benefit">
+          <app-icon [name]="beneficio.icono" [size]="24" />
+          <h3>{{ beneficio.titulo }}</h3>
+          <p>{{ beneficio.texto }}</p>
+        </article>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0;">
+  <div class="container">
+    <div class="cta-band">
+      <div>
+        <span class="eyebrow" style="color: var(--qm-lime);">Hoy es buen día para comer bien</span>
+        <h2>Tu mesa te espera.</h2>
+        <p>
+          Crea tu reserva en línea y recoge cuando estés listo. Si eres nuevo,
+          inicia sesión con tu cuenta institucional.
+        </p>
+        <div class="hero__actions">
+          <a class="btn btn-lime btn-lg" routerLink="/catalogo">Reservar mi almuerzo</a>
+          @if (!keycloak.autenticado()) {
+            <a class="btn btn-ghost btn-lg" routerLink="/login">Iniciar sesión</a>
+          } @else {
+            <a class="btn btn-ghost btn-lg" [routerLink]="keycloak.rutaInicio()">Ir a mi panel</a>
+          }
+        </div>
+      </div>
+      <div class="cta-band__art" aria-hidden="true">Q</div>
+    </div>
+  </div>
+</section>

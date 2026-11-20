@@ -1,0 +1,133 @@
+<div class="page">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Ruta de navegación">
+      <a routerLink="/">Inicio</a>
+      <app-icon name="chevron-right" [size]="13" />
+      <span>Menú de hoy</span>
+    </nav>
+
+    <div class="page-head">
+      <div>
+        <span class="eyebrow">Servicio de hoy</span>
+        <h1>Elige tu menú de hoy</h1>
+        <p>
+          Desayunos, almuerzos, postres y bebidas saludables para recoger el día de hoy.
+          @if (!cargando() && !error()) {
+            <strong>{{ totalDisponibles() }}</strong> con stock disponible.
+          }
+        </p>
+      </div>
+      <a class="btn btn-ghost" routerLink="/carrito">
+        <app-icon name="bag" [size]="17" />
+        Mi carrito
+        @if (carrito.totalUnidades() > 0) {
+          <span class="chip__count" style="background: var(--qm-green-800); color: #fff;">{{ carrito.totalUnidades() }}</span>
+        }
+      </a>
+    </div>
+
+    @if (!keycloak.autenticado()) {
+      <div class="alert alert-info" style="margin-bottom: 1.2rem;">
+        <app-icon name="info" [size]="18" />
+        <span>
+          Puedes explorar el menú libremente. Para reservar y pagar, <a routerLink="/login" [queryParams]="{ returnUrl: '/catalogo' }">inicia sesión</a>.
+          Tu carrito se conserva en este dispositivo.
+        </span>
+      </div>
+    }
+
+    <div class="catalog-toolbar">
+      <div class="search-box">
+        <app-icon name="search" [size]="17" />
+        <input
+          class="input"
+          type="search"
+          placeholder="Buscar por plato, ingrediente o categoría…"
+          [value]="busqueda()"
+          (input)="buscar($event)"
+          aria-label="Buscar platos">
+      </div>
+      <select class="select" [value]="orden()" (change)="cambiarOrden($event)" aria-label="Ordenar catálogo">
+        <option value="relevancia">Menú sugerido</option>
+        <option value="precio-asc">Menor precio</option>
+        <option value="precio-desc">Mayor precio</option>
+        <option value="nombre">Nombre A–Z</option>
+      </select>
+      @if (hayFiltro()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="limpiarFiltros()">
+          <app-icon name="close" [size]="15" /> Limpiar
+        </button>
+      }
+    </div>
+
+    @if (!cargando() && categorias().length > 0) {
+      <div class="chip-row" style="margin-bottom: 1.1rem;">
+        <button type="button" class="chip" [class.is-active]="categoriaId() === 'todas'" (click)="filtrarCategoria('todas')">
+          Todos
+          <span class="chip__count">{{ activos().length }}</span>
+        </button>
+        @for (categoria of categorias(); track categoria.id) {
+          <button
+            type="button"
+            class="chip"
+            [class.is-active]="categoriaId() === categoria.id"
+            (click)="filtrarCategoria(categoria.id)">
+            {{ categoria.nombre }}
+            <span class="chip__count">{{ categoria.total }}</span>
+          </button>
+        }
+      </div>
+    }
+
+    @if (cargando()) {
+      <div class="catalog-grid">
+        @for (n of [1, 2, 3, 4, 5, 6]; track n) {
+          <div class="skeleton skeleton-card"></div>
+        }
+      </div>
+    } @else if (error()) {
+      <div class="empty-state">
+        <span class="empty-state__icon"><app-icon name="alert" [size]="26" /></span>
+        <h3>Catálogo no disponible</h3>
+        <p>{{ error() }}</p>
+        <button type="button" class="btn btn-outline" (click)="cargar()">
+          <app-icon name="refresh" [size]="16" /> Reintentar
+        </button>
+      </div>
+    } @else if (filtrados().length === 0) {
+      <div class="empty-state">
+        <span class="empty-state__icon"><app-icon name="search" [size]="26" /></span>
+        <h3>Sin resultados</h3>
+        <p>
+          @if (hayFiltro()) {
+            No encontramos platos con esos filtros. Prueba con otra búsqueda.
+          } @else {
+            Aún no hay platos publicados para hoy.
+          }
+        </p>
+        @if (hayFiltro()) {
+          <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Ver todo el menú</button>
+        }
+      </div>
+    } @else {
+      <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.9rem;">
+        <span class="results-count">
+          {{ filtrados().length }} {{ filtrados().length === 1 ? 'plato' : 'platos' }}
+          @if (hayFiltro()) { encontrados }
+        </span>
+        <span class="results-count">Precios en soles (S/)</span>
+      </div>
+      <div class="catalog-grid">
+        @for (producto of filtrados(); track producto.id; let i = $index) {
+          <app-producto-card [producto]="producto" [indice]="i" />
+        }
+      </div>
+    }
+
+    <div class="note" style="margin-top: 2rem;">
+      <strong>Nota de transparencia:</strong> las fotografías son ilustrativas y locales;
+      el catálogo no almacena una imagen por producto. La reserva corresponde al servicio
+      del día y el stock se descuenta al confirmar el pedido.
+    </div>
+  </div>
+</div>
