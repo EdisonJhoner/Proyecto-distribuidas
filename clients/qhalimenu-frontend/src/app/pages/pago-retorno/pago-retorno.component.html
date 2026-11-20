@@ -1,0 +1,32 @@
+<div class="retorno panel">
+  @if (cargando()) {
+    <div class="retorno__icon">
+      <span class="spinner"></span>
+    </div>
+    <h1>Verificando tu pago</h1>
+    <p class="muted">{{ mensaje() }}</p>
+  } @else if (error()) {
+    <div class="retorno__icon is-error">
+      <app-icon name="alert" [size]="30" />
+    </div>
+    <h1>No pudimos confirmar el pago</h1>
+    <div class="alert alert-error">
+      <app-icon name="alert" [size]="17" />
+      <span>{{ error() }}</span>
+    </div>
+    <div class="retorno__actions">
+      <a routerLink="/mis-ordenes" class="btn btn-primary">Ver mis reservas</a>
+      <a routerLink="/carrito" class="btn btn-ghost">Volver al carrito</a>
+    </div>
+  } @else {
+    <div class="retorno__icon is-pending">
+      <app-icon name="clock" [size]="30" />
+    </div>
+    <h1>Pago pendiente</h1>
+    <p class="muted">{{ mensaje() }}</p>
+    <div class="retorno__actions">
+      <a routerLink="/mis-ordenes" class="btn btn-primary">Ver mis reservas</a>
+      <a routerLink="/carrito" class="btn btn-ghost">Volver al carrito</a>
+    </div>
+  }
+</div>

@@ -36,7 +36,12 @@ public class OrdenReconciliador {
     public void cancelarOrdenesEstancadas() {
         LocalDateTime limite = LocalDateTime.now().minusMinutes(timeoutMinutos);
         List<Orden> estancadas =
-                ordenRepository.findByEstadoAndFechaCreacionBeforeConDetalles(ESTADO_PENDIENTE_PAGO, limite);
+                ordenRepository.findByEstadoAndFechaCreacionBeforeConDetalles(ESTADO_PENDIENTE_PAGO, limite)
+                        .stream()
+                        // El efectivo está PENDIENTE_PAGO a propósito: espera a que Caja cobre.
+                        // Cancelarlo aquí hace que el pedido desaparezca de la cola de recojo.
+                        .filter(orden -> !"EFECTIVO".equalsIgnoreCase(String.valueOf(orden.getMetodoPago())))
+                        .toList();
         if (estancadas.isEmpty()) {
             return;
         }

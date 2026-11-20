@@ -144,18 +144,19 @@
             <strong>S/ {{ pedido.total | number:'1.2-2' }}</strong>
           </div>
 
-          @if ((esPagada() || esEntregada()) && pedido.codigoRecojo) {
+          @if (!esCancelada() && pedido.codigoRecojo) {
             <section class="ticket__pickup">
               <small>Código de recojo</small>
               <span class="ticket__code">{{ pedido.codigoRecojo }}</span>
               <img [src]="qrRecojo(pedido.codigoRecojo)" alt="Código QR de recojo">
-              <p>Presenta este código o deja que lo escaneen en caja.</p>
+              <p>
+                @if (esPendiente()) {
+                  Guarda este código. La entrega se habilita cuando el pago sea confirmado.
+                } @else {
+                  Presenta este código o deja que lo escaneen en caja.
+                }
+              </p>
             </section>
-          } @else if (esPendiente()) {
-            <div class="alert alert-warning" style="margin-top: 1.2rem; justify-content: center;">
-              <app-icon name="clock" [size]="18" />
-              <span>El código de recojo se habilita cuando el pago sea confirmado.</span>
-            </div>
           } @else if (esCancelada()) {
             <div class="alert alert-error" style="margin-top: 1.2rem; justify-content: center;">
               <app-icon name="alert" [size]="18" />
@@ -183,7 +184,7 @@
             } @else {
               <p class="tiny muted mb-0">
                 La reserva conserva tu stock. Reintenta el pago con
-                <strong>{{ metodo(pedido.metodoPago) }}</strong> para generar tu código de recojo.
+                <strong>{{ metodo(pedido.metodoPago) }}</strong> para confirmar el recojo.
               </p>
               <button type="button" class="btn btn-primary" [disabled]="pagando()" (click)="reintentarPago()">
                 @if (pagando()) {

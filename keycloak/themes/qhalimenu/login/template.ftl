@@ -120,7 +120,7 @@
           </li>
           <li>
             <span class="qm-points__num">2</span>
-            <span><strong>Paga</strong> con tarjeta, Yape, Plin o efectivo.</span>
+            <span><strong>Paga</strong> con Mercado Pago o efectivo en caja.</span>
           </li>
           <li>
             <span class="qm-points__num">3</span>

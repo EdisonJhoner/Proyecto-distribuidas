@@ -1,0 +1,85 @@
+<div class="checkout">
+  <header class="checkout__head">
+    <div class="checkout__brand">
+      <app-icon name="shield" [size]="22" />
+      <span><strong>mercado</strong> pago</span>
+    </div>
+    <span class="status-badge is-neutral">
+      <app-icon name="lock" [size]="13" /> Pago seguro · entorno de simulación
+    </span>
+  </header>
+
+  <div class="checkout__grid">
+    <section class="panel">
+      <h1>Elige cómo quieres pagar</h1>
+      <p class="muted">
+        Tu reserva está guardada. Selecciona el método de pago y confirma para completar la compra.
+      </p>
+
+      <div class="pay-methods">
+        @for (opcion of opciones; track opcion.valor) {
+          <label class="pay-method" [class.is-active]="metodo() === opcion.valor">
+            <input
+              type="radio"
+              name="metodoCheckout"
+              [value]="opcion.valor"
+              [checked]="metodo() === opcion.valor"
+              (change)="metodo.set(opcion.valor)">
+            <app-icon [name]="opcion.icono" [size]="20" />
+            <span>
+              {{ opcion.etiqueta }}
+              <small>{{ opcion.detalle }}</small>
+            </span>
+          </label>
+        }
+      </div>
+
+      <div class="note">
+        <app-icon name="info" [size]="15" style="vertical-align: -2px;" />
+        No se solicitarán datos reales de tarjeta: el cobro se aprueba al confirmar.
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">
+          <app-icon name="alert" [size]="17" />
+          <span>{{ error() }}</span>
+        </div>
+      }
+
+      <div class="checkout__actions">
+        <button
+          type="button"
+          class="btn btn-primary btn-lg"
+          [disabled]="procesando() || !orden() || !!error()"
+          (click)="confirmar()">
+          @if (procesando()) {
+            <span class="spinner spinner--sm" style="border-top-color: #fff;"></span>
+            Procesando…
+          } @else {
+            Confirmar pago
+          }
+        </button>
+        <a routerLink="/mis-ordenes" class="btn btn-ghost">Volver a mis reservas</a>
+      </div>
+    </section>
+
+    <aside class="panel checkout__summary">
+      <h2>Resumen de la compra</h2>
+      <div class="checkout__row">
+        <span>Reserva</span>
+        <strong>QhaliMenu · Orden #{{ ordenId }}</strong>
+      </div>
+      <div class="checkout__row">
+        <span>Estado</span>
+        <strong class="is-pending">Pendiente de pago</strong>
+      </div>
+      <div class="checkout__total">
+        <span>Total a pagar</span>
+        <strong>S/ {{ total() | number:'1.2-2' }}</strong>
+      </div>
+      <p class="tiny muted mb-0">
+        Referencia de preferencia: <code>{{ preferenceId }}</code>
+      </p>
+    </aside>
+  </div>
+</div>

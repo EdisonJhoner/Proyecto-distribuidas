@@ -25,6 +25,14 @@ export class PagosService {
     return this.http.get<Pago>(`${this.base}/simulacion/${encodeURIComponent(preferenceId)}`);
   }
 
+  /** Retorno del checkout real de Mercado Pago (endpoint permitido sin JWT en el gateway). */
+  feedback(preferenceId: string, collectionStatus?: string | null, status?: string | null): Observable<Pago> {
+    const params: Record<string, string> = { preference_id: preferenceId };
+    if (collectionStatus) params['collection_status'] = collectionStatus;
+    if (status) params['status'] = status;
+    return this.http.get<Pago>(`${this.base}/feedback`, { params });
+  }
+
   confirmarBilletera(ordenId: number): Observable<Pago> {
     return this.http.post<Pago>(`${this.base}/orden/${ordenId}/confirmar-billetera`, {});
   }

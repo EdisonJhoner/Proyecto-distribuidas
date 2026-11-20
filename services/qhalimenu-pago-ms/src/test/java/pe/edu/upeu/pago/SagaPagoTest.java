@@ -109,6 +109,16 @@ class SagaPagoTest {
     }
 
     @Test
+    void ordenCreadaConMercadoPagoQuedaPendienteHastaElegirMetodoEnElCheckout() throws Exception {
+        kafkaTemplate.send("orden-eventos", "820", ordenCreadaMercadoPago(820L)).get(10, TimeUnit.SECONDS);
+
+        Pago pago = esperarPago(820L);
+        assertEquals("PENDIENTE", pago.getEstadoPago(),
+                "Mercado Pago no debe aprobarse automáticamente: el cliente elige el método en el checkout");
+        assertEquals("MERCADOPAGO", pago.getMetodoPago());
+    }
+
+    @Test
     void ordenCreadaEnEfectivoQuedaPendienteHastaConfirmarElCobro() throws Exception {
         kafkaTemplate.send("orden-eventos", "800", ordenCreadaEfectivo(800L)).get(10, TimeUnit.SECONDS);
 
@@ -152,6 +162,20 @@ class SagaPagoTest {
                 "PENDIENTE_PAGO",
                 Instant.now(),
                 List.of(new OrdenItemEvento(10L, 1, new BigDecimal("18.00"))));
+    }
+
+    private OrdenCreadaEvento ordenCreadaMercadoPago(Long ordenId) {
+        return new OrdenCreadaEvento(
+                UUID.randomUUID().toString(),
+                OrdenCreadaEvento.TIPO,
+                ordenId,
+                "1",
+                new BigDecimal("25.00"),
+                "MERCADOPAGO",
+                "ANTICIPADO",
+                "PENDIENTE_PAGO",
+                Instant.now(),
+                List.of(new OrdenItemEvento(10L, 1, new BigDecimal("25.00"))));
     }
 
     private OrdenCreadaEvento ordenCreadaEfectivo(Long ordenId) {

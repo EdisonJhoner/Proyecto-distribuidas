@@ -2,7 +2,6 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { Orden } from '../../models/orden.models';
 import { CarritoService, ItemCarrito } from '../../services/carrito.service';
 import { CatalogoService } from '../../services/catalogo.service';
@@ -31,7 +30,7 @@ export class CarritoComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
-  readonly metodo = signal<MetodoPagoUI>('TARJETA');
+  readonly metodo = signal<MetodoPagoUI>('MERCADOPAGO');
   readonly tipoComprobante = signal('BOLETA');
   readonly nombreCliente = signal('');
   readonly procesando = signal(false);
@@ -40,20 +39,15 @@ export class CarritoComponent implements OnInit {
   readonly aviso = signal('');
 
   readonly metodos: { valor: MetodoPagoUI; etiqueta: string; detalle: string; icono: IconName }[] = [
-    { valor: 'TARJETA', etiqueta: 'Tarjeta', detalle: 'Pasarela segura (demo)', icono: 'card' },
-    { valor: 'YAPE', etiqueta: 'Yape', detalle: 'Billetera digital', icono: 'wallet' },
-    { valor: 'PLIN', etiqueta: 'Plin', detalle: 'Billetera digital', icono: 'wallet' },
+    {
+      valor: 'MERCADOPAGO',
+      etiqueta: 'Mercado Pago',
+      detalle: 'Tarjeta o Yape en la página de pago',
+      icono: 'card'
+    },
     { valor: 'EFECTIVO', etiqueta: 'Efectivo', detalle: 'Pagas al recoger', icono: 'cash' }
   ];
 
-  readonly qrDemo = computed(() => {
-    const metodo = this.metodo();
-    const total = this.carrito.totalMonto().toFixed(2);
-    const data = encodeURIComponent(`QHALIMENU-DEMO-${metodo}-${total}`);
-    return `${environment.qrApiUrl}?size=220x220&data=${data}`;
-  });
-
-  readonly esBilletera = computed(() => this.metodo() === 'YAPE' || this.metodo() === 'PLIN');
   readonly esEfectivo = computed(() => this.metodo() === 'EFECTIVO');
 
   ngOnInit(): void {
@@ -156,6 +150,12 @@ export class CarritoComponent implements OnInit {
 
     try {
       const resultado = await this.pagoFlujo.pagar(orden, this.metodo());
+      if (resultado.estado === 'CHECKOUT' && resultado.preferenceId) {
+        await this.router.navigate(['/checkout/mercadopago', resultado.preferenceId], {
+          queryParams: { ordenId: orden.id }
+        });
+        return;
+      }
       if (resultado.estado === 'REDIRIGIDO') {
         return;
       }

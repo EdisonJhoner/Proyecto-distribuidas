@@ -6,12 +6,14 @@ import { KeycloakService } from './keycloak.service';
 import { OrdenesService } from './ordenes.service';
 import { PagosService } from './pagos.service';
 
-export type MetodoPagoUI = 'TARJETA' | 'YAPE' | 'PLIN' | 'EFECTIVO';
+export type MetodoPagoUI = 'TARJETA' | 'MERCADOPAGO' | 'YAPE' | 'PLIN' | 'EFECTIVO';
 
 export interface ResultadoPago {
-  /** PAGADA: la orden ya figura pagada. PENDIENTE: pago enviado, la orden se actualizará. */
-  estado: 'PAGADA' | 'PENDIENTE' | 'REDIRIGIDO';
+  /** PAGADA: la orden ya figura pagada. PENDIENTE: pago enviado, la orden se actualizará.
+   *  REDIRIGIDO: va a la pasarela real. CHECKOUT: debe elegir método en el checkout simulado. */
+  estado: 'PAGADA' | 'PENDIENTE' | 'REDIRIGIDO' | 'CHECKOUT';
   orden?: Orden;
+  preferenceId?: string;
   mensaje: string;
 }
 
@@ -44,6 +46,16 @@ export class PagoFlujoService {
       };
     }
 
+    if (metodo === 'MERCADOPAGO' && pago.modoSimulacion && pago.preferenceId
+        && pago.estadoPago !== 'PROCESADO') {
+      return {
+        estado: 'CHECKOUT',
+        orden,
+        preferenceId: pago.preferenceId,
+        mensaje: 'Elige el método de pago en Mercado Pago para confirmar tu reserva.'
+      };
+    }
+
     if (pago.estadoPago === 'PROCESADO') {
       return this.esperarOrdenPagada(orden);
     }
@@ -53,10 +65,60 @@ export class PagoFlujoService {
       return this.esperarOrdenPagada(orden);
     }
 
-    return this.confirmarTarjeta(orden, pago);
+    return this.confirmarPasarela(orden, pago);
   }
 
-  private async confirmarTarjeta(orden: Orden, pago: Pago): Promise<ResultadoPago> {
+  /** Confirma el checkout simulado de Mercado Pago después de elegir el método. */
+  async confirmarCheckoutSimulado(preferenceId: string, ordenId: number): Promise<ResultadoPago> {
+    await firstValueFrom(this.pagos.confirmarSimulacion(preferenceId));
+    const orden = await firstValueFrom(this.ordenes.obtener(ordenId));
+    return this.esperarOrdenPagada(orden);
+  }
+
+  /** Procesa el retorno del checkout real de Mercado Pago (pago-retorno). */
+  async procesarRetorno(
+    preferenceId: string | null | undefined,
+    collectionStatus?: string | null,
+    status?: string | null,
+    externalReference?: string | null
+  ): Promise<ResultadoPago> {
+    // Mercado Pago normalmente devuelve preference_id, pero en algunos retornos
+    // manuales solo llega external_reference (el id de la orden). Resolvemos
+    // la preferencia desde el pago guardado para no perder la boleta.
+    let referencia = preferenceId?.trim() || '';
+    if (!referencia && externalReference) {
+      const ordenId = Number(externalReference);
+      if (Number.isFinite(ordenId) && ordenId > 0) {
+        const pagosOrden = await firstValueFrom(this.pagos.listarPorOrden(ordenId));
+        const conPreferencia = pagosOrden.filter(pago => !!pago.preferenceId);
+        const real = [...conPreferencia].reverse().find(pago => !pago.preferenceId!.startsWith('SIM-'));
+        referencia = (real ?? conPreferencia[conPreferencia.length - 1])?.preferenceId ?? '';
+      }
+    }
+    if (!referencia) {
+      throw new Error('Mercado Pago no devolvió la referencia del pago.');
+    }
+
+    const pago = await firstValueFrom(this.pagos.feedback(referencia, collectionStatus, status));
+    const orden = await firstValueFrom(this.ordenes.obtener(pago.ordenId));
+    if (pago.estadoPago === 'PROCESADO') {
+      return this.esperarOrdenPagada(orden);
+    }
+    if (pago.estadoPago === 'RECHAZADO') {
+      return {
+        estado: 'PENDIENTE',
+        orden,
+        mensaje: 'Mercado Pago rechazó el pago. Puedes intentarlo de nuevo desde la boleta.'
+      };
+    }
+    return {
+      estado: 'PENDIENTE',
+      orden,
+      mensaje: 'Tu pago está pendiente en Mercado Pago. La reserva se actualizará al confirmarse.'
+    };
+  }
+
+  private async confirmarPasarela(orden: Orden, pago: Pago): Promise<ResultadoPago> {
     if (pago.modoSimulacion && pago.preferenceId) {
       await firstValueFrom(this.pagos.confirmarSimulacion(pago.preferenceId));
       return this.esperarOrdenPagada(orden);

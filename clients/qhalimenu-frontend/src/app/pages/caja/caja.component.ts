@@ -81,24 +81,35 @@ export class CajaComponent implements OnInit, OnDestroy {
   private animacion = 0;
   private leyendo = false;
   private ultimoScan = 0;
+  private temporizador?: ReturnType<typeof setInterval>;
 
   ngOnInit(): void {
     this.cargarPendientes();
+    // La cola debe actualizarse aunque la pantalla ya estuviera abierta cuando
+    // el cliente creó la reserva o cuando Kafka confirmó un pago.
+    this.temporizador = setInterval(() => this.cargarPendientes(true), 10000);
   }
 
   ngOnDestroy(): void {
+    if (this.temporizador) {
+      clearInterval(this.temporizador);
+    }
     this.cerrarCamara();
   }
 
-  cargarPendientes(): void {
-    this.cargandoPendientes.set(true);
+  cargarPendientes(silencioso = false): void {
+    if (!silencioso) {
+      this.cargandoPendientes.set(true);
+    }
     this.ordenes.pendientesRecojo().subscribe({
       next: pendientes => {
         this.pendientes.set(pendientes);
         this.cargandoPendientes.set(false);
       },
       error: () => {
-        this.pendientes.set([]);
+        if (!silencioso) {
+          this.pendientes.set([]);
+        }
         this.cargandoPendientes.set(false);
       }
     });

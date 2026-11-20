@@ -78,12 +78,16 @@ logging:
     pe.edu.upeu.pago: DEBUG
 
 mercadopago:
+  # PRUEBA únicamente: copia el Access Token del selector "Prueba" del panel
+  # Developers. Nunca pongas aquí un token de "Producción".
+  entorno: PRUEBA
   access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
   placeholder-token: TEST-YOUR-ACCESS-TOKEN
   currency-id: PEN
-  success-url: http://localhost:18080/api/v1/pagos/feedback
-  failure-url: http://localhost:18080/api/v1/pagos/feedback
-  pending-url: http://localhost:18080/api/v1/pagos/feedback
+  # Retorno al frontend: consulta el feedback y muestra la boleta.
+  success-url: http://localhost:4200/pago-retorno
+  failure-url: http://localhost:4200/pago-retorno
+  pending-url: http://localhost:4200/pago-retorno
   notification-url: http://localhost:18080/api/v1/pagos/webhook
   simulation-base-url: http://localhost:18080/api/v1/pagos/simulacion
   simulation-id-prefix: SIM-

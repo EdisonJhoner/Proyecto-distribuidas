@@ -35,13 +35,16 @@ describe('PagoFlujoService', () => {
     pagos = jasmine.createSpyObj<PagosService>('PagosService', [
       'crearPreferencia',
       'confirmarBilletera',
-      'confirmarSimulacion'
+      'confirmarSimulacion',
+      'feedback',
+      'listarPorOrden'
     ]);
     ordenes = jasmine.createSpyObj<OrdenesService>('OrdenesService', ['obtener']);
 
     pagos.crearPreferencia.and.returnValue(of(pagoPendiente));
     pagos.confirmarBilletera.and.returnValue(of(pagoPendiente));
     pagos.confirmarSimulacion.and.returnValue(of({ ...pagoPendiente, estadoPago: 'PROCESADO' }));
+    pagos.feedback.and.returnValue(of({ ...pagoPendiente, estadoPago: 'PROCESADO' }));
 
     TestBed.configureTestingModule({
       providers: [
@@ -90,6 +93,52 @@ describe('PagoFlujoService', () => {
     const resultado = await servicio.pagar(orden, 'TARJETA');
 
     expect(pagos.confirmarSimulacion).toHaveBeenCalledWith('pref-1');
+    expect(resultado.estado).toBe('PAGADA');
+  });
+
+  it('para Mercado Pago crea la preferencia y deriva al checkout sin pagar de inmediato', async () => {
+    const resultado = await servicio.pagar(orden, 'MERCADOPAGO');
+
+    expect(pagos.crearPreferencia).toHaveBeenCalledWith({
+      ordenId: 7,
+      monto: 25,
+      metodoPago: 'MERCADOPAGO',
+      email: 'cliente@upeu.edu.pe'
+    });
+    expect(resultado.estado).toBe('CHECKOUT');
+    expect(resultado.preferenceId).toBe('pref-1');
+    expect(pagos.confirmarSimulacion).not.toHaveBeenCalled();
+  });
+
+  it('confirma el checkout simulado de Mercado Pago y espera la orden pagada', async () => {
+    ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
+
+    const resultado = await servicio.confirmarCheckoutSimulado('pref-1', 7);
+
+    expect(pagos.confirmarSimulacion).toHaveBeenCalledWith('pref-1');
+    expect(resultado.estado).toBe('PAGADA');
+  });
+
+  it('al volver de Mercado Pago consulta el feedback y deja la orden pagada', async () => {
+    ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
+
+    const resultado = await servicio.procesarRetorno('pref-real-1', 'approved', 'approved');
+
+    expect(pagos.feedback).toHaveBeenCalledWith('pref-real-1', 'approved', 'approved');
+    expect(resultado.estado).toBe('PAGADA');
+  });
+
+  it('al volver sin preference_id usa external_reference para recuperar el pago', async () => {
+    ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
+    pagos.listarPorOrden.and.returnValue(of([
+      { ...pagoPendiente, preferenceId: 'SIM-1' },
+      { ...pagoPendiente, preferenceId: 'pref-real-2' }
+    ]));
+
+    const resultado = await servicio.procesarRetorno(null, 'approved', 'approved', '7');
+
+    expect(pagos.listarPorOrden).toHaveBeenCalledWith(7);
+    expect(pagos.feedback).toHaveBeenCalledWith('pref-real-2', 'approved', 'approved');
     expect(resultado.estado).toBe('PAGADA');
   });
 

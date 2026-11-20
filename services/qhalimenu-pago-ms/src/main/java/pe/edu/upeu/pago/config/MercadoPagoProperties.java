@@ -3,14 +3,20 @@ package pe.edu.upeu.pago.config;
 import com.mercadopago.MercadoPagoConfig;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Getter
 @Component
 @RefreshScope
 public class MercadoPagoProperties {
+
+    /** Solo informativo: el proyecto se entrega configurado para PRUEBA (sandbox). */
+    @Value("${mercadopago.entorno:PRUEBA}")
+    private String entorno;
 
     @Value("${mercadopago.access-token:}")
     private String accessToken;
@@ -41,8 +47,16 @@ public class MercadoPagoProperties {
 
     @PostConstruct
     public void configurarSdk() {
-        if (!usarSimulacion()) {
+        if (usarSimulacion()) {
+            log.warn("Mercado Pago: modo SIMULACIÓN (sin token). El checkout es local.");
+        } else {
+            // Mercado Pago emite credenciales de prueba y de producción con el prefijo
+            // APP_USR-, por eso el entorno lo define el token que se copie del panel.
+            // Este proyecto solo debe usar el token del selector "Prueba".
             MercadoPagoConfig.setAccessToken(accessToken);
+            log.info("Mercado Pago: modo REAL · entorno configurado = {} · " +
+                            "usa el token copiado del selector 'Prueba' (nunca de 'Producción')",
+                    entorno);
         }
     }
 
@@ -51,10 +65,13 @@ public class MercadoPagoProperties {
         if (token.isEmpty()) {
             return true;
         }
-        if (token.startsWith("APP_USR-")) {
-            return false;
-        }
         String placeholder = placeholderToken == null ? "" : placeholderToken.trim();
-        return token.equals(placeholder);
+        if (token.equalsIgnoreCase(placeholder)
+                || token.toUpperCase().contains("YOUR-ACCESS-TOKEN")
+                || token.toUpperCase().contains("YOUR_ACCESS_TOKEN")) {
+            return true;
+        }
+        // Cualquier token real (incluidos los de prueba APP_USR-) usa la API de MP.
+        return false;
     }
 }

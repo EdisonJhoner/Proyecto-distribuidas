@@ -57,6 +57,24 @@ class OrdenReconciliadorTest {
     }
 
     @Test
+    void noCancelaElEfectivoQueEsperaCobroEnCaja() {
+        Orden estancada = Orden.builder()
+                .id(2L)
+                .idCliente("1")
+                .estado("PENDIENTE_PAGO")
+                .metodoPago("EFECTIVO")
+                .build();
+        when(ordenRepository.findByEstadoAndFechaCreacionBeforeConDetalles(
+                eq("PENDIENTE_PAGO"), any(LocalDateTime.class)))
+                .thenReturn(List.of(estancada));
+
+        reconciliador.cancelarOrdenesEstancadas();
+
+        assertEquals("PENDIENTE_PAGO", estancada.getEstado());
+        verify(ordenRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void noHaceNadaSiNoHayOrdenesEstancadas() {
         when(ordenRepository.findByEstadoAndFechaCreacionBeforeConDetalles(
                 eq("PENDIENTE_PAGO"), any(LocalDateTime.class)))

@@ -4,6 +4,8 @@ import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferencePayerRequest;
+import com.mercadopago.client.preference.PreferencePaymentMethodsRequest;
+import com.mercadopago.client.preference.PreferencePaymentTypeRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
@@ -35,6 +37,7 @@ public class PagoService {
     public static final String METODO_EFECTIVO = "EFECTIVO";
     public static final String METODO_YAPE = "YAPE";
     public static final String METODO_PLIN = "PLIN";
+    public static final String METODO_MERCADOPAGO = "MERCADOPAGO";
 
     private final PagoRepository pagoRepository;
     private final PagoMapper pagoMapper;
@@ -71,7 +74,9 @@ public class PagoService {
         String metodoPago = evento.metodoPago() == null || evento.metodoPago().isBlank()
                 ? "MERCADOPAGO"
                 : evento.metodoPago();
-        String preferenceId = esEfectivo(metodoPago)
+        // Con token real el preferenceId lo asigna Mercado Pago al crear la preferencia;
+        // el id simulado solo se usa cuando no hay token configurado.
+        String preferenceId = esEfectivo(metodoPago) || !mercadoPagoProperties.usarSimulacion()
                 ? null
                 : mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID();
         Pago pago = Pago.builder()
@@ -82,7 +87,12 @@ public class PagoService {
                 .preferenceId(preferenceId)
                 .fechaPago(LocalDateTime.now())
                 .build();
-        if (mercadoPagoProperties.usarSimulacion() && !esEfectivo(metodoPago) && !esBilletera(metodoPago)) {
+        // Mercado Pago requiere que el cliente elija el método en el checkout:
+        // el pago se aprueba solo cuando confirma desde la pasarela (o su simulación).
+        if (mercadoPagoProperties.usarSimulacion()
+                && !esEfectivo(metodoPago)
+                && !esBilletera(metodoPago)
+                && !esMercadoPago(metodoPago)) {
             pago.setEstadoPago("PROCESADO");
         }
         Pago guardado = pagoRepository.save(pago);
@@ -319,10 +329,12 @@ public class PagoService {
                 .currencyId("PEN")
                 .build();
 
+        // El navegador vuelve al frontend: ahí se consulta el feedback y se muestra
+        // la boleta con el estado real de la orden.
         PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
-                .success("https://www.google.com")
-                .failure("https://www.google.com")
-                .pending("https://www.google.com")
+                .success(mercadoPagoProperties.getSuccessUrl())
+                .failure(mercadoPagoProperties.getFailureUrl())
+                .pending(mercadoPagoProperties.getPendingUrl())
                 .build();
 
         String emailComprador = request.getEmailComprador();
@@ -339,9 +351,24 @@ public class PagoService {
                         .build());
 
         if (backUrls != null) {
+            // Mercado Pago solo permite auto_return con URLs HTTPS públicas. En DEV las
+            // URLs son http://localhost, así que el checkout muestra el enlace
+            // "Volver al sitio" y el navegador regresa a /pago-retorno al pulsarlo.
             preferenceBuilder.backUrls(backUrls);
-            preferenceBuilder.autoReturn("approved");
         }
+
+        // QhaliMenu solo atiende tarjetas (crédito/débito) y Yape dentro de Mercado Pago.
+        // Se excluyen el resto de tipos para que el checkout no ofrezca métodos ajenos.
+        PreferencePaymentMethodsRequest paymentMethods = PreferencePaymentMethodsRequest.builder()
+                .excludedPaymentTypes(List.of(
+                        tipoExcluido("wallet"),
+                        tipoExcluido("bank_transfer"),
+                        tipoExcluido("atm"),
+                        tipoExcluido("prepaid_card"),
+                        tipoExcluido("ticket"),
+                        tipoExcluido("digital_currency")))
+                .build();
+        preferenceBuilder.paymentMethods(paymentMethods);
 
         PreferenceRequest preferenceRequest = preferenceBuilder.build();
 
@@ -357,6 +384,12 @@ public class PagoService {
             log.error("MercadoPago MPException: {}", e.getMessage(), e);
             return null;
         }
+    }
+
+    private PreferencePaymentTypeRequest tipoExcluido(String id) {
+        return PreferencePaymentTypeRequest.builder()
+                .id(id)
+                .build();
     }
 
     private String mapearEstado(String estadoMercadoPago) {
@@ -387,6 +420,10 @@ public class PagoService {
         }
         String valor = metodoPago.trim().toUpperCase();
         return METODO_YAPE.equals(valor) || METODO_PLIN.equals(valor);
+    }
+
+    private boolean esMercadoPago(String metodoPago) {
+        return metodoPago != null && METODO_MERCADOPAGO.equalsIgnoreCase(metodoPago.trim());
     }
 
     private Pago buscarOFallar(Long id) {

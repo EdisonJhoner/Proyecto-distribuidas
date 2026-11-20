@@ -173,7 +173,7 @@ export function etiquetaMetodoPago(metodo?: string): string {
     case 'EFECTIVO':
       return 'Efectivo en caja';
     case 'MERCADOPAGO':
-      return 'MercadoPago';
+      return 'Mercado Pago';
     default:
       return metodo || '—';
   }

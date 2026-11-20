@@ -150,17 +150,6 @@
               }
             </div>
 
-            @if (esBilletera()) {
-              <div class="qr-box" style="margin-top: 1rem;">
-                <img [src]="qrDemo()" [alt]="'QR demostrativo de cobro ' + metodo()">
-                <strong style="font-size: 0.86rem;">QR de cobro demostrativo</strong>
-                <p class="tiny muted mb-0">
-                  Este código no realiza cargos reales. Al continuar, el sistema simula
-                  la confirmación de tu transferencia {{ metodo() }}.
-                </p>
-              </div>
-            }
-
             @if (esEfectivo()) {
               <div class="alert alert-warning" style="margin-top: 1rem;">
                 <app-icon name="cash" [size]="18" />
@@ -171,11 +160,13 @@
               </div>
             }
 
-            @if (metodo() === 'TARJETA') {
+            @if (metodo() === 'MERCADOPAGO') {
               <div class="note" style="margin-top: 1rem;">
                 <app-icon name="card" [size]="15" style="vertical-align: -2px;" />
-                Serás atendido por la pasarela de pago. En este entorno la pasarela
-                opera en <strong>modo simulación</strong> y no solicita datos reales de tarjeta.
+                Al confirmar te llevaremos a la página de <strong>Mercado Pago</strong>
+                (entorno de prueba). Ahí elige <strong>tarjeta</strong> o <strong>Yape</strong>
+                y completa el cobro. Tu reserva queda pendiente hasta que Mercado Pago
+                la confirme.
               </div>
             }
           </section>

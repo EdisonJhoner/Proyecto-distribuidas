@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { Orden } from '../../models/orden.models';
@@ -25,7 +25,7 @@ import {
   templateUrl: './boleta.component.html',
   styleUrl: './boleta.component.css'
 })
-export class BoletaComponent implements OnInit {
+export class BoletaComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly ordenes = inject(OrdenesService);
@@ -40,6 +40,8 @@ export class BoletaComponent implements OnInit {
   readonly recienCreada = signal(false);
   readonly errorPago = signal(false);
 
+  private temporizador?: ReturnType<typeof setInterval>;
+
   readonly esPendiente = computed(() => this.orden()?.estado === 'PENDIENTE_PAGO');
   readonly esPagada = computed(() => this.orden()?.estado === 'PAGADA');
   readonly esEntregada = computed(() => this.orden()?.estado === 'ENTREGADA');
@@ -47,7 +49,7 @@ export class BoletaComponent implements OnInit {
 
   readonly metodoOrden = computed<MetodoPagoUI>(() => {
     const metodo = this.orden()?.metodoPago;
-    return (['TARJETA', 'YAPE', 'PLIN', 'EFECTIVO'].includes(metodo ?? '') ? metodo : 'TARJETA') as MetodoPagoUI;
+    return (['TARJETA', 'MERCADOPAGO', 'YAPE', 'PLIN', 'EFECTIVO'].includes(metodo ?? '') ? metodo : 'MERCADOPAGO') as MetodoPagoUI;
   });
 
   readonly metodoEsEfectivo = computed(() => this.metodoOrden() === 'EFECTIVO');
@@ -75,10 +77,25 @@ export class BoletaComponent implements OnInit {
       return;
     }
     this.cargar(id);
+    // La orden puede pasar a PAGADA cuando Kafka confirma el pago: refrescamos
+    // la boleta mientras esté pendiente para mostrar el código de recojo.
+    this.temporizador = setInterval(() => {
+      if (this.esPendiente() && !this.pagando()) {
+        this.cargar(id, true);
+      }
+    }, 5000);
   }
 
-  cargar(id: number): void {
-    this.cargando.set(true);
+  ngOnDestroy(): void {
+    if (this.temporizador) {
+      clearInterval(this.temporizador);
+    }
+  }
+
+  cargar(id: number, silencioso = false): void {
+    if (!silencioso) {
+      this.cargando.set(true);
+    }
     this.ordenes.obtener(id).subscribe({
       next: orden => {
         this.orden.set(orden);
@@ -86,8 +103,10 @@ export class BoletaComponent implements OnInit {
         this.error.set('');
       },
       error: () => {
-        this.cargando.set(false);
-        this.error.set('No pudimos cargar esta boleta. Verifica el número de orden e inténtalo otra vez.');
+        if (!silencioso) {
+          this.cargando.set(false);
+          this.error.set('No pudimos cargar esta boleta. Verifica el número de orden e inténtalo otra vez.');
+        }
       }
     });
   }

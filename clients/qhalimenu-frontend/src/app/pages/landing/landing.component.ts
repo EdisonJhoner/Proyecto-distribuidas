@@ -69,7 +69,7 @@ export class LandingComponent implements OnInit {
     {
       icono: 'card' as const,
       titulo: 'Reserva y paga',
-      texto: 'Tarjeta, Yape, Plin o efectivo en caja. Todo bajo autenticación segura.'
+      texto: 'Mercado Pago o efectivo en caja. Todo bajo autenticación segura.'
     },
     {
       icono: 'qr' as const,

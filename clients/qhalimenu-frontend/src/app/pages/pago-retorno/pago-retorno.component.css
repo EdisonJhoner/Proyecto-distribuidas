@@ -1,0 +1,50 @@
+.retorno {
+  max-width: 520px;
+  margin: 2.5rem auto;
+  padding: 2.5rem 2rem;
+  text-align: center;
+}
+
+.retorno h1 {
+  font-size: 1.5rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.retorno__icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 158, 227, 0.1);
+  color: #009ee3;
+}
+
+.retorno__icon.is-error {
+  background: rgba(200, 50, 50, 0.1);
+  color: #b42318;
+}
+
+.retorno__icon.is-pending {
+  background: rgba(168, 107, 0, 0.12);
+  color: #a86b00;
+}
+
+.retorno .spinner {
+  width: 30px;
+  height: 30px;
+}
+
+.retorno .alert {
+  text-align: left;
+  margin-top: 1.25rem;
+}
+
+.retorno__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}

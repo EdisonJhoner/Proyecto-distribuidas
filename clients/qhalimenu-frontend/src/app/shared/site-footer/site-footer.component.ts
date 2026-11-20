@@ -42,12 +42,11 @@ import { IconComponent } from '../icon/icon.component';
         <div class="site-footer__col">
           <h3>Pagos y recojo</h3>
           <p class="site-footer__payments">
-            <span class="pay-pill"><app-icon name="card" [size]="15" /> Tarjeta</span>
-            <span class="pay-pill"><app-icon name="wallet" [size]="15" /> Yape / Plin</span>
+            <span class="pay-pill"><app-icon name="card" [size]="15" /> Mercado Pago</span>
             <span class="pay-pill"><app-icon name="cash" [size]="15" /> Efectivo</span>
           </p>
           <p class="site-footer__hint">
-            Las pasarelas operan en modo demostración. No se realizan cobros reales.
+            Mercado Pago opera en entorno de prueba. El efectivo se paga al recoger.
           </p>
         </div>
       </div>
