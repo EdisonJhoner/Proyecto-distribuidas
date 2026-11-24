@@ -8,11 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -20,9 +18,6 @@ import java.util.List;
 @RequestMapping("/api/v1/pagos")
 @RequiredArgsConstructor
 public class PagoController {
-
-    private static final String INIT_POINT_SIMULADO =
-            "https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=simulated_12345";
 
     private final PagoService pagoService;
 
@@ -34,11 +29,6 @@ public class PagoController {
     @GetMapping("/orden/{ordenId}")
     public List<PagoResponse> listarPorOrden(@PathVariable Long ordenId) {
         return pagoService.listarPorOrden(ordenId);
-    }
-
-    @GetMapping("/simulacion/{preferenceId}")
-    public PagoResponse confirmarSimulacion(@PathVariable String preferenceId) {
-        return pagoService.confirmarSimulacion(preferenceId);
     }
 
     @GetMapping("/feedback")
@@ -71,39 +61,19 @@ public class PagoController {
         return pagoService.confirmarEfectivoPorOrden(ordenId);
     }
 
-    @PostMapping("/orden/{ordenId}/confirmar-billetera")
-    public PagoResponse confirmarBilletera(@PathVariable Long ordenId) {
-        return pagoService.confirmarBilletera(ordenId);
-    }
-
     @PostMapping("/crear-preferencia")
-    public ResponseEntity<PagoResponse> crearPreferencia(@RequestBody(required = false) PagoRequest request) {
-        try {
-            PagoRequest seguro = request != null ? request : new PagoRequest();
-            return ResponseEntity.ok(pagoService.crearPreferencia(seguro));
-        } catch (Throwable t) {
-            log.error("Error crítico en PagoController: ", t);
-            return ResponseEntity.ok(respuestaSimulacion(request));
-        }
+    public PagoResponse crearPreferencia(@RequestBody(required = false) PagoRequest request) {
+        return pagoService.crearPreferencia(request != null ? request : new PagoRequest());
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class})
-    public ResponseEntity<PagoResponse> manejarErrorDeEntrada(Throwable t) {
-        log.error("Error crítico en PagoController: ", t);
-        return ResponseEntity.ok(respuestaSimulacion(null));
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> conflicto(IllegalStateException e) {
+        log.warn("Conflicto al crear pago: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(e.getMessage());
     }
 
-    private PagoResponse respuestaSimulacion(PagoRequest request) {
-        Long ordenId = request != null && request.getOrdenId() != null ? request.getOrdenId() : 0L;
-        BigDecimal monto = request != null && request.getMonto() != null ? request.getMonto() : BigDecimal.ZERO;
-        return PagoResponse.builder()
-                .ordenId(ordenId)
-                .monto(monto)
-                .metodoPago("MERCADOPAGO")
-                .estadoPago("PENDIENTE")
-                .initPoint(INIT_POINT_SIMULADO)
-                .sandboxInitPoint(INIT_POINT_SIMULADO)
-                .modoSimulacion(true)
-                .build();
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<String> entradaInvalida(MethodArgumentNotValidException e) {
+        return ResponseEntity.badRequest().body("Datos de pago inválidos");
     }
 }

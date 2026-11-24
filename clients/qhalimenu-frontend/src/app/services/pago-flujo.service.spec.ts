@@ -11,13 +11,15 @@ describe('PagoFlujoService', () => {
   let pagos: jasmine.SpyObj<PagosService>;
   let ordenes: jasmine.SpyObj<OrdenesService>;
 
+  const checkoutReal = 'https://sandbox.mercadopago.com.pe/checkout/v1/payment/redirect/real-1';
+
   const orden: Orden = {
     id: 7,
     idCliente: 'cli',
     fechaCreacion: new Date().toISOString(),
     estado: 'PENDIENTE_PAGO',
     tipoComprobante: 'BOLETA',
-    metodoPago: 'TARJETA',
+    metodoPago: 'MERCADOPAGO',
     momentoPago: 'AHORA',
     total: 25
   };
@@ -25,25 +27,22 @@ describe('PagoFlujoService', () => {
   const pagoPendiente = {
     ordenId: 7,
     monto: 25,
-    metodoPago: 'TARJETA',
+    metodoPago: 'MERCADOPAGO',
     estadoPago: 'PENDIENTE',
-    modoSimulacion: true,
-    preferenceId: 'pref-1'
+    preferenceId: 'pref-1',
+    initPoint: 'https://www.mercadopago.com.pe/checkout/v1/payment/redirect/real-1',
+    sandboxInitPoint: checkoutReal
   };
 
   beforeEach(() => {
     pagos = jasmine.createSpyObj<PagosService>('PagosService', [
       'crearPreferencia',
-      'confirmarBilletera',
-      'confirmarSimulacion',
       'feedback',
       'listarPorOrden'
     ]);
     ordenes = jasmine.createSpyObj<OrdenesService>('OrdenesService', ['obtener']);
 
     pagos.crearPreferencia.and.returnValue(of(pagoPendiente));
-    pagos.confirmarBilletera.and.returnValue(of(pagoPendiente));
-    pagos.confirmarSimulacion.and.returnValue(of({ ...pagoPendiente, estadoPago: 'PROCESADO' }));
     pagos.feedback.and.returnValue(of({ ...pagoPendiente, estadoPago: 'PROCESADO' }));
 
     TestBed.configureTestingModule({
@@ -58,46 +57,8 @@ describe('PagoFlujoService', () => {
   });
 
   it('crea la preferencia con el total y el correo de la sesión', async () => {
-    ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
-    await servicio.pagar(orden, 'TARJETA');
-    expect(pagos.crearPreferencia).toHaveBeenCalledWith({
-      ordenId: 7,
-      monto: 25,
-      metodoPago: 'TARJETA',
-      email: 'cliente@upeu.edu.pe'
-    });
-  });
-
-  it('deja el efectivo pendiente de confirmación en caja', async () => {
-    pagos.crearPreferencia.and.returnValue(of({ ...pagoPendiente, metodoPago: 'EFECTIVO' }));
-    const resultado = await servicio.pagar(orden, 'EFECTIVO');
-    expect(resultado.estado).toBe('PENDIENTE');
-    expect(resultado.mensaje).toContain('caja');
-    expect(pagos.confirmarSimulacion).not.toHaveBeenCalled();
-    expect(pagos.confirmarBilletera).not.toHaveBeenCalled();
-  });
-
-  it('para billeteras confirma el pago y espera la orden pagada', async () => {
-    pagos.crearPreferencia.and.returnValue(of({ ...pagoPendiente, metodoPago: 'YAPE' }));
-    ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
-
-    const resultado = await servicio.pagar(orden, 'YAPE');
-
-    expect(pagos.confirmarBilletera).toHaveBeenCalledWith(7);
-    expect(resultado.estado).toBe('PAGADA');
-  });
-
-  it('para tarjeta usa la pasarela simulada cuando corresponde', async () => {
-    ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
-
-    const resultado = await servicio.pagar(orden, 'TARJETA');
-
-    expect(pagos.confirmarSimulacion).toHaveBeenCalledWith('pref-1');
-    expect(resultado.estado).toBe('PAGADA');
-  });
-
-  it('para Mercado Pago crea la preferencia y deriva al checkout sin pagar de inmediato', async () => {
-    const resultado = await servicio.pagar(orden, 'MERCADOPAGO');
+    const ventana = { closed: false, location: { href: '' }, focus: () => {} } as unknown as Window;
+    await servicio.pagar(orden, 'MERCADOPAGO', ventana);
 
     expect(pagos.crearPreferencia).toHaveBeenCalledWith({
       ordenId: 7,
@@ -105,18 +66,48 @@ describe('PagoFlujoService', () => {
       metodoPago: 'MERCADOPAGO',
       email: 'cliente@upeu.edu.pe'
     });
-    expect(resultado.estado).toBe('CHECKOUT');
-    expect(resultado.preferenceId).toBe('pref-1');
-    expect(pagos.confirmarSimulacion).not.toHaveBeenCalled();
   });
 
-  it('confirma el checkout simulado de Mercado Pago y espera la orden pagada', async () => {
-    ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
+  it('deja el efectivo pendiente de confirmación en caja', async () => {
+    pagos.crearPreferencia.and.returnValue(of({ ...pagoPendiente, metodoPago: 'EFECTIVO' }));
 
-    const resultado = await servicio.confirmarCheckoutSimulado('pref-1', 7);
+    const resultado = await servicio.pagar(orden, 'EFECTIVO');
 
-    expect(pagos.confirmarSimulacion).toHaveBeenCalledWith('pref-1');
-    expect(resultado.estado).toBe('PAGADA');
+    expect(resultado.estado).toBe('PENDIENTE');
+    expect(resultado.mensaje).toContain('caja');
+  });
+
+  it('carga el checkout real de Mercado Pago en la ventana abierta por el usuario', async () => {
+    const ventana = {
+      closed: false,
+      location: { href: '' },
+      focus: jasmine.createSpy('focus')
+    } as unknown as Window;
+
+    const resultado = await servicio.pagar(orden, 'MERCADOPAGO', ventana);
+
+    expect(resultado.estado).toBe('REDIRIGIDO');
+    expect(ventana.location.href).toBe(checkoutReal);
+    expect(ventana.focus).toHaveBeenCalled();
+  });
+
+  it('abre una ventana nueva si no se preabrió en el clic', async () => {
+    const ventana = { closed: false, location: { href: '' }, focus: () => {} } as unknown as Window;
+    spyOn(window, 'open').and.returnValue(ventana);
+
+    await servicio.pagar(orden, 'MERCADOPAGO');
+
+    expect(window.open).toHaveBeenCalledWith(checkoutReal, '_blank', 'popup,width=1100,height=800');
+  });
+
+  it('avisa si Mercado Pago no devuelve la URL del checkout', async () => {
+    pagos.crearPreferencia.and.returnValue(of({
+      ...pagoPendiente,
+      initPoint: undefined,
+      sandboxInitPoint: undefined
+    }));
+
+    await expectAsync(servicio.pagar(orden, 'MERCADOPAGO')).toBeRejectedWithError(/URL de su checkout/);
   });
 
   it('al volver de Mercado Pago consulta el feedback y deja la orden pagada', async () => {
@@ -131,7 +122,7 @@ describe('PagoFlujoService', () => {
   it('al volver sin preference_id usa external_reference para recuperar el pago', async () => {
     ordenes.obtener.and.returnValue(of({ ...orden, estado: 'PAGADA' }));
     pagos.listarPorOrden.and.returnValue(of([
-      { ...pagoPendiente, preferenceId: 'SIM-1' },
+      { ...pagoPendiente, preferenceId: 'pref-real-1' },
       { ...pagoPendiente, preferenceId: 'pref-real-2' }
     ]));
 
@@ -145,7 +136,7 @@ describe('PagoFlujoService', () => {
   it('informa la cancelación cuando la orden deja de estar pendiente', async () => {
     ordenes.obtener.and.returnValue(of({ ...orden, estado: 'CANCELADA' }));
 
-    const resultado = await servicio.pagar(orden, 'TARJETA');
+    const resultado = await servicio.procesarRetorno('pref-real-1', 'approved', 'approved');
 
     expect(resultado.estado).toBe('PENDIENTE');
     expect(resultado.mensaje).toContain('cancelada');

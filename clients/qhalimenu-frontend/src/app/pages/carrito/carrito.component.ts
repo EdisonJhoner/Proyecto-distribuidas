@@ -129,6 +129,12 @@ export class CarritoComponent implements OnInit {
       return;
     }
 
+    // Se abre en el gesto del clic: si se abriera después de los awaits, el
+    // navegador lo trataría como popup bloqueado.
+    const ventanaPago = this.metodo() === 'MERCADOPAGO'
+      ? window.open('', '_blank', 'popup,width=1100,height=800')
+      : null;
+
     this.procesando.set(true);
     let orden: Orden;
     try {
@@ -140,6 +146,9 @@ export class CarritoComponent implements OnInit {
         detalles: items.map(item => ({ idProducto: item.id, cantidad: item.cantidad }))
       }));
     } catch (error) {
+      if (ventanaPago && !ventanaPago.closed) {
+        ventanaPago.location.href = `${window.location.origin}/?pagoError=1`;
+      }
       this.procesando.set(false);
       this.error.set(mensajeHttp(error, 'No se pudo crear la reserva. Revisa el stock e inténtalo otra vez.'));
       return;
@@ -149,14 +158,9 @@ export class CarritoComponent implements OnInit {
     this.carrito.vaciar();
 
     try {
-      const resultado = await this.pagoFlujo.pagar(orden, this.metodo());
-      if (resultado.estado === 'CHECKOUT' && resultado.preferenceId) {
-        await this.router.navigate(['/checkout/mercadopago', resultado.preferenceId], {
-          queryParams: { ordenId: orden.id }
-        });
-        return;
-      }
+      const resultado = await this.pagoFlujo.pagar(orden, this.metodo(), ventanaPago);
       if (resultado.estado === 'REDIRIGIDO') {
+        this.toast.info('Pago en otra ventana', resultado.mensaje);
         return;
       }
       if (resultado.estado === 'PAGADA') {
@@ -166,6 +170,10 @@ export class CarritoComponent implements OnInit {
       }
       await this.router.navigate(['/boleta', orden.id], { queryParams: { nuevo: 1 } });
     } catch (error) {
+      if (ventanaPago && !ventanaPago.closed) {
+        ventanaPago.location.href = `${window.location.origin}/boleta/${orden.id}?pagoError=1`;
+        ventanaPago.focus();
+      }
       this.toast.error('Reserva creada, pago pendiente', mensajeHttp(error));
       await this.router.navigate(['/boleta', orden.id], { queryParams: { pagoError: 1 } });
     } finally {

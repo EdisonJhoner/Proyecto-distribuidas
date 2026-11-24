@@ -52,15 +52,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "spring.kafka.consumer.group-id=qhalimenu-pago-ms",
         "spring.kafka.consumer.auto-offset-reset=earliest",
-        "mercadopago.access-token=TEST-YOUR-ACCESS-TOKEN",
+        "mercadopago.access-token=TEST-1234567890123456789012",
         "mercadopago.placeholder-token=TEST-YOUR-ACCESS-TOKEN",
         "mercadopago.currency-id=PEN",
         "mercadopago.success-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.failure-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.pending-url=http://localhost:18080/api/v1/pagos/feedback",
-        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook",
-        "mercadopago.simulation-base-url=http://localhost:18080/api/v1/pagos/simulacion",
-        "mercadopago.simulation-id-prefix=SIM-"
+        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook"
 })
 @EmbeddedKafka(partitions = 1, topics = {
         "orden-eventos", "orden-eventos.DLT", "pago-eventos", "pago-eventos.DLT"

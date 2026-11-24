@@ -23,6 +23,5 @@ public class PagoResponse {
     private String preferenceId;
     private String initPoint;
     private String sandboxInitPoint;
-    private boolean modoSimulacion;
     private LocalDateTime fechaPago;
 }

@@ -44,13 +44,6 @@ export const routes: Routes = [
         title: 'Carrito y pago · QhaliMenu'
       },
       {
-        path: 'checkout/mercadopago/:preferenceId',
-        canActivate: [clienteGuard],
-        loadComponent: () => import('./pages/checkout-mercadopago/checkout-mercadopago.component')
-          .then(m => m.CheckoutMercadoPagoComponent),
-        title: 'Pagar con Mercado Pago · QhaliMenu'
-      },
-      {
         path: 'pago-retorno',
         loadComponent: () => import('./pages/pago-retorno/pago-retorno.component')
           .then(m => m.PagoRetornoComponent),

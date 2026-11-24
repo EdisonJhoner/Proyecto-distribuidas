@@ -165,7 +165,7 @@ cd infra\qhalimenu-gateway
   - `GET http://localhost:18080/api/v1/pagos`
 - Swagger DEV: `http://localhost:8080/swagger-ui.html`, `http://localhost:8082/swagger-ui.html`, `http://localhost:8084/swagger-ui.html` y `http://localhost:8086/swagger-ui.html`
 - Compra exprés (sin registro): `POST http://localhost:18080/api/v1/clientes` con `numeroDocumento`, `nombres` y `celular`. Consulta: `GET http://localhost:18080/api/v1/clientes/documento/{dni}`
-- Pagos: `POST http://localhost:18080/api/v1/pagos/crear-preferencia`. Si el token en Config Server es `TEST-YOUR-ACCESS-TOKEN` o MercadoPago falla, responde en modo simulación (`modoSimulacion: true`) con `initPoint` a `/api/v1/pagos/simulacion/{preferenceId}`. Para cobro real, cambia `mercadopago.access-token` en `qhalimenu-pago-ms-dev.yml`.
+- Pagos: `POST http://localhost:18080/api/v1/pagos/crear-preferencia` crea la preferencia y devuelve el `sandbox_init_point` real de Mercado Pago; el frontend lo abre en otra ventana. Sin un Access Token de Prueba responde error (no hay checkout simulado). Configura el token con `configurar-mercadopago.ps1` (ver `docs/accesos-dev.md`). El cobro en efectivo se confirma desde Caja.
 
 ## Pruebas
 

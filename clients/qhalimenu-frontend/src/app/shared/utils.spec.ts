@@ -78,9 +78,9 @@ describe('utils', () => {
 
   it('suma solo los pagos procesados', () => {
     const pagos: Pago[] = [
-      { ordenId: 1, monto: 20, metodoPago: 'TARJETA', estadoPago: 'PROCESADO', modoSimulacion: true },
-      { ordenId: 2, monto: 15, metodoPago: 'YAPE', estadoPago: 'PENDIENTE', modoSimulacion: true },
-      { ordenId: 3, monto: 10, metodoPago: 'EFECTIVO', estadoPago: 'PROCESADO', modoSimulacion: true }
+      { ordenId: 1, monto: 20, metodoPago: 'MERCADOPAGO', estadoPago: 'PROCESADO' },
+      { ordenId: 2, monto: 15, metodoPago: 'MERCADOPAGO', estadoPago: 'PENDIENTE' },
+      { ordenId: 3, monto: 10, metodoPago: 'EFECTIVO', estadoPago: 'PROCESADO' }
     ];
     expect(totalProcesado(pagos)).toBe(30);
   });

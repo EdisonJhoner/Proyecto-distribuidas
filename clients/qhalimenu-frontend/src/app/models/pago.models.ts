@@ -9,7 +9,6 @@ export interface Pago {
   preferenceId?: string;
   initPoint?: string;
   sandboxInitPoint?: string;
-  modoSimulacion: boolean;
   fechaPago?: string;
 }
 

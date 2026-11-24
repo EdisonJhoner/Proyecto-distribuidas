@@ -133,11 +133,11 @@ El tablero no viene precargado (en pagatu también se arma a mano en S10, Tabla 
 - App: `clients/qhalimenu-frontend` (Angular 19), `ng serve` → `:4200`.
 - API: interceptor Bearer hacia `http://localhost:18080/api/v1/...` únicamente.
 - Auth: `KeycloakService` — `onLoad: check-sso`, `pkceMethod: S256`. Token en el objeto Keycloak (memoria).
-- Flujo: catálogo público → login → Ordenar (efectivo o tarjeta simulada) → Mis órdenes (polling 5 s). El módulo de **Caja** muestra el efectivo por cobrar con QR y registra el cobro; luego habilita la entrega.
+- Flujo: catálogo público → login → Ordenar (Mercado Pago en ventana externa o efectivo) → Mis órdenes (polling 5 s). El módulo de **Caja** muestra el efectivo por cobrar con QR y registra el cobro; luego habilita la entrega.
 
 ### 4.7 Decisión propia distinta a `pagatu`
 
-1. **Dos métodos de pago de negocio:** `EFECTIVO` (caja, confirma el propio `CAJA` sin pasar por administración) y `TARJETA` (simulación MercadoPago). `pagatu` se centra en la pasarela.
+1. **Dos métodos de pago de negocio:** `EFECTIVO` (caja, confirma el propio `CAJA` sin pasar por administración) y `MERCADOPAGO` (checkout real externo, sin interfaz de pago dentro del proyecto). `pagatu` se centra en la pasarela.
 2. **Outbox + reconciliador** encima de la SAGA coreografiada, para no perder eventos si Kafka está caído.
 3. **`idCliente` = `sub` de Keycloak (UUID String)** en órdenes, en lugar de un Long de tabla propia. `cliente-ms` (compra exprés de U1) queda como ficha auxiliar.
 
@@ -172,7 +172,7 @@ El contrato REST de U1 se mantiene. Todo el tráfico de negocio entra por `qhali
 | Catálogo | `8080` / `8081` | Lectura pública; Feign desde órdenes |
 | Órdenes | `8082` / `8083` | Feign, Outbox, SAGA, `/mis-ordenes` |
 | Cliente | `8084` / `8085` | Resource Server (ficha DNI) |
-| Pago | `8086` / `8087` | Consumidor Kafka + simulación / efectivo |
+| Pago | `8086` / `8087` | Consumidor Kafka + checkout real de Mercado Pago / efectivo |
 | Auth (legado) | `8088` | JWT propio S7; ya no emite tokens del frontend |
 | Keycloak | `18180` | IdP OIDC |
 | Kafka / Kafka UI | `19092` / `18085` | Eventos de la SAGA |

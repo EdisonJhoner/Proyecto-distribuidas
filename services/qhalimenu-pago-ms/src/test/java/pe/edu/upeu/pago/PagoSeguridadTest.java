@@ -34,15 +34,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
-        "mercadopago.access-token=TEST-YOUR-ACCESS-TOKEN",
+        "mercadopago.access-token=TEST-1234567890123456789012",
         "mercadopago.placeholder-token=TEST-YOUR-ACCESS-TOKEN",
         "mercadopago.currency-id=PEN",
         "mercadopago.success-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.failure-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.pending-url=http://localhost:18080/api/v1/pagos/feedback",
-        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook",
-        "mercadopago.simulation-base-url=http://localhost:18080/api/v1/pagos/simulacion",
-        "mercadopago.simulation-id-prefix=SIM-"
+        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook"
 })
 @AutoConfigureMockMvc
 class PagoSeguridadTest {
@@ -105,7 +103,7 @@ class PagoSeguridadTest {
     @Test
     void crearPreferenciaRequiereAutenticacion() throws Exception {
         String body = """
-                {"ordenId": 1, "monto": 12.50, "metodoPago": "MERCADOPAGO"}
+                {"ordenId": 1, "monto": 12.50, "metodoPago": "EFECTIVO"}
                 """;
 
         mockMvc.perform(post("/api/v1/pagos/crear-preferencia")
@@ -175,22 +173,6 @@ class PagoSeguridadTest {
     }
 
     @Test
-    void confirmarBilleteraLoPuedeElCliente() throws Exception {
-        Pago pago = pagoRepository.save(Pago.builder()
-                .ordenId(321L)
-                .monto(new BigDecimal("12.00"))
-                .metodoPago("YAPE")
-                .estadoPago("PENDIENTE")
-                .fechaPago(LocalDateTime.now())
-                .build());
-
-        mockMvc.perform(post("/api/v1/pagos/orden/" + pago.getOrdenId() + "/confirmar-billetera")
-                        .with(clienteToken()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoPago").value("PROCESADO"));
-    }
-
-    @Test
     void webhookEsPublico() throws Exception {
         mockMvc.perform(get("/api/v1/pagos/webhook"))
                 .andExpect(status().isOk());
@@ -199,12 +181,6 @@ class PagoSeguridadTest {
     @Test
     void feedbackEsPublicoPeroFalla404SiNoExisteElPago() throws Exception {
         mockMvc.perform(get("/api/v1/pagos/feedback").param("preference_id", "SIM-inexistente"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void simulacionEsPublicaPeroFalla404SiNoExisteElPago() throws Exception {
-        mockMvc.perform(get("/api/v1/pagos/simulacion/SIM-inexistente"))
                 .andExpect(status().isNotFound());
     }
 

@@ -1,17 +1,11 @@
 package pe.edu.upeu.pago;
 
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
-import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 import pe.edu.upeu.pago.entity.Pago;
 import pe.edu.upeu.pago.event.OrdenCreadaEvento;
@@ -20,11 +14,8 @@ import pe.edu.upeu.pago.outbox.OutboxEventoService;
 import pe.edu.upeu.pago.repository.PagoRepository;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -46,15 +37,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "spring.kafka.consumer.group-id=qhalimenu-pago-ms",
         "spring.kafka.consumer.auto-offset-reset=earliest",
-        "mercadopago.access-token=TEST-YOUR-ACCESS-TOKEN",
+        "mercadopago.access-token=TEST-1234567890123456789012",
         "mercadopago.placeholder-token=TEST-YOUR-ACCESS-TOKEN",
         "mercadopago.currency-id=PEN",
         "mercadopago.success-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.failure-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.pending-url=http://localhost:18080/api/v1/pagos/feedback",
-        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook",
-        "mercadopago.simulation-base-url=http://localhost:18080/api/v1/pagos/simulacion",
-        "mercadopago.simulation-id-prefix=SIM-"
+        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook"
 })
 @EmbeddedKafka(partitions = 1, topics = {
         "orden-eventos", "orden-eventos.DLT", "pago-eventos", "pago-eventos.DLT"
@@ -74,16 +63,13 @@ class SagaPagoTest {
     private OutboxEventoService outboxEventoService;
 
     @Test
-    void ordenCreadaRegistraYValidaElPagoYPublicaPagoValidado() throws Exception {
+    void ordenCreadaRegistraElPagoPendienteSinAprobarloAutomaticamente() throws Exception {
         kafkaTemplate.send("orden-eventos", "500", ordenCreada(500L)).get(10, TimeUnit.SECONDS);
 
         Pago pago = esperarPago(500L);
-        assertEquals("PROCESADO", pago.getEstadoPago());
-        assertNotNull(pago.getPreferenceId());
-
-        List<String> eventos = consumirTexto("pago-eventos", 1, 15000);
-        assertTrue(eventos.stream().anyMatch(v -> v.contains("pago.validado") && v.contains("500")),
-                "Debe publicarse 'pago.validado' para la orden 500: " + eventos);
+        assertEquals("PENDIENTE", pago.getEstadoPago(),
+                "El pago se aprueba solo desde el checkout real o desde Caja");
+        assertNotNull(pago.getId());
     }
 
     @Test
@@ -134,7 +120,7 @@ class SagaPagoTest {
                 "orden-eventos", "700", "ORDEN", OrdenCreadaEvento.TIPO, ordenCreada(700L));
 
         Pago pago = esperarPago(700L);
-        assertEquals("PROCESADO", pago.getEstadoPago());
+        assertEquals("PENDIENTE", pago.getEstadoPago());
     }
 
     private OrdenCreadaEvento ordenCreada(Long ordenId) {        return new OrdenCreadaEvento(
@@ -204,26 +190,5 @@ class SagaPagoTest {
         }
         assertNotNull(pago, "Debe registrarse un pago para la orden " + ordenId);
         return pago;
-    }
-
-    private List<String> consumirTexto(String topic, int cantidad, long timeoutMs) {
-        Map<String, Object> props = KafkaTestUtils.consumerProps(
-                "test-" + UUID.randomUUID(), "true", embeddedKafka);
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
-        DefaultKafkaConsumerFactory<String, String> factory = new DefaultKafkaConsumerFactory<>(props);
-        try (Consumer<String, String> consumer = factory.createConsumer()) {
-            embeddedKafka.consumeFromAnEmbeddedTopic(consumer, topic);
-            List<String> resultado = new ArrayList<>();
-            long limite = System.currentTimeMillis() + timeoutMs;
-            while (resultado.size() < cantidad && System.currentTimeMillis() < limite) {
-                for (ConsumerRecord<String, String> record : consumer.poll(Duration.ofMillis(500))) {
-                    resultado.add(record.value());
-                }
-            }
-            return resultado;
-        }
     }
 }

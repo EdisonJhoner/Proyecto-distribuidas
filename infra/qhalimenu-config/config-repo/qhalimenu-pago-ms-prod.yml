@@ -67,8 +67,6 @@ mercadopago:
   failure-url: ${MERCADOPAGO_FAILURE_URL:http://qhalimenu-gateway:8080/api/v1/pagos/feedback}
   pending-url: ${MERCADOPAGO_PENDING_URL:http://qhalimenu-gateway:8080/api/v1/pagos/feedback}
   notification-url: ${MERCADOPAGO_NOTIFICATION_URL:http://qhalimenu-gateway:8080/api/v1/pagos/webhook}
-  simulation-base-url: ${MERCADOPAGO_SIMULATION_URL:http://qhalimenu-gateway:8080/api/v1/pagos/simulacion}
-  simulation-id-prefix: ${MERCADOPAGO_SIMULATION_PREFIX:SIM-}
 
 qhalimenu:
   kafka:

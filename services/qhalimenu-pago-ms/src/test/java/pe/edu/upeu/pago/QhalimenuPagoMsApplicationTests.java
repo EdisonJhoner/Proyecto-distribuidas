@@ -14,15 +14,13 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
         "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:0/jwks",
-        "mercadopago.access-token=TEST-YOUR-ACCESS-TOKEN",
+        "mercadopago.access-token=TEST-1234567890123456789012",
         "mercadopago.placeholder-token=TEST-YOUR-ACCESS-TOKEN",
         "mercadopago.currency-id=PEN",
         "mercadopago.success-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.failure-url=http://localhost:18080/api/v1/pagos/feedback",
         "mercadopago.pending-url=http://localhost:18080/api/v1/pagos/feedback",
-        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook",
-        "mercadopago.simulation-base-url=http://localhost:18080/api/v1/pagos/simulacion",
-        "mercadopago.simulation-id-prefix=SIM-"
+        "mercadopago.notification-url=http://localhost:18080/api/v1/pagos/webhook"
 })
 class QhalimenuPagoMsApplicationTests {
 

@@ -89,8 +89,6 @@ mercadopago:
   failure-url: http://localhost:4200/pago-retorno
   pending-url: http://localhost:4200/pago-retorno
   notification-url: http://localhost:18080/api/v1/pagos/webhook
-  simulation-base-url: http://localhost:18080/api/v1/pagos/simulacion
-  simulation-id-prefix: SIM-
 
 qhalimenu:
   kafka:

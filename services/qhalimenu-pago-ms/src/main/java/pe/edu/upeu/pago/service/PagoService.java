@@ -27,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -35,8 +34,6 @@ import java.util.UUID;
 public class PagoService {
 
     public static final String METODO_EFECTIVO = "EFECTIVO";
-    public static final String METODO_YAPE = "YAPE";
-    public static final String METODO_PLIN = "PLIN";
     public static final String METODO_MERCADOPAGO = "MERCADOPAGO";
 
     private final PagoRepository pagoRepository;
@@ -74,38 +71,22 @@ public class PagoService {
         String metodoPago = evento.metodoPago() == null || evento.metodoPago().isBlank()
                 ? "MERCADOPAGO"
                 : evento.metodoPago();
-        // Con token real el preferenceId lo asigna Mercado Pago al crear la preferencia;
-        // el id simulado solo se usa cuando no hay token configurado.
-        String preferenceId = esEfectivo(metodoPago) || !mercadoPagoProperties.usarSimulacion()
-                ? null
-                : mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID();
+        // El preferenceId lo asigna Mercado Pago al crear la preferencia en el checkout real.
         Pago pago = Pago.builder()
                 .ordenId(evento.ordenId())
                 .monto(evento.total())
                 .metodoPago(metodoPago)
                 .estadoPago("PENDIENTE")
-                .preferenceId(preferenceId)
                 .fechaPago(LocalDateTime.now())
                 .build();
-        // Mercado Pago requiere que el cliente elija el método en el checkout:
-        // el pago se aprueba solo cuando confirma desde la pasarela (o su simulación).
-        if (mercadoPagoProperties.usarSimulacion()
-                && !esEfectivo(metodoPago)
-                && !esBilletera(metodoPago)
-                && !esMercadoPago(metodoPago)) {
-            pago.setEstadoPago("PROCESADO");
-        }
         Pago guardado = pagoRepository.save(pago);
         publicarEventoSiCambioDeEstado(guardado, "PENDIENTE");
-        if ("PROCESADO".equals(guardado.getEstadoPago())) {
-            log.info("Pago {} registrado y validado (simulación) para la orden {}",
-                    guardado.getId(), guardado.getOrdenId());
-        } else if (esEfectivo(metodoPago)) {
+        if (esEfectivo(metodoPago)) {
             log.info("Pago {} en EFECTIVO registrado PENDIENTE para la orden {}; " +
                     "la orden seguirá en PENDIENTE_PAGO hasta que se confirme el cobro",
                     guardado.getId(), guardado.getOrdenId());
         } else {
-            log.info("Pago {} registrado PENDIENTE para la orden {}; se espera confirmación de MercadoPago",
+            log.info("Pago {} registrado PENDIENTE para la orden {}; se espera confirmación de Mercado Pago",
                     guardado.getId(), guardado.getOrdenId());
         }
         return Optional.of(guardado);
@@ -129,30 +110,26 @@ public class PagoService {
                 return pagoMapper.toResponse(existente);
             }
 
-            if (existente != null && esBilletera(existente.getMetodoPago())
-                    && "PENDIENTE".equals(existente.getEstadoPago())) {
-                if (existente.getPreferenceId() == null || existente.getPreferenceId().isBlank()) {
-                    existente.setPreferenceId(mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID());
-                    existente = pagoRepository.save(existente);
-                }
-                String url = urlSimulacion(existente.getPreferenceId());
-                return pagoMapper.toResponse(existente, url, url, true);
-            }
-
             if (esEfectivo(metodoPago)) {
                 log.info("La orden {} usa pago en EFECTIVO; no se genera preferencia de pasarela",
                         request.getOrdenId());
-                return guardarSimulacion(request, metodoPago, existente);
+                Pago pago = existente != null ? existente : Pago.builder().build();
+                pago.setOrdenId(request.getOrdenId());
+                if (request.getMonto() != null) {
+                    pago.setMonto(request.getMonto());
+                }
+                pago.setMetodoPago(metodoPago);
+                pago.setEstadoPago("PENDIENTE");
+                pago.setFechaPago(LocalDateTime.now());
+                return pagoMapper.toResponse(pagoRepository.save(pago));
             }
 
-            if (mercadoPagoProperties.usarSimulacion()) {
-                return guardarSimulacion(request, metodoPago, existente);
-            }
-
+            mercadoPagoProperties.validarToken();
             Preference preference = crearPreferenceMercadoPago(request);
-            if (preference == null) {
-                log.warn("MercadoPago falló; se activa modo simulación para no interrumpir la compra");
-                return guardarSimulacion(request, metodoPago, existente);
+            if (preference == null
+                    || preference.getInitPoint() == null || preference.getInitPoint().isBlank()) {
+                throw new IllegalStateException(
+                        "Mercado Pago no devolvió el checkout. Revisa el Access Token de Prueba.");
             }
 
             Pago pago = existente != null ? existente : Pago.builder().build();
@@ -167,54 +144,14 @@ public class PagoService {
             return pagoMapper.toResponse(
                     pagoRepository.save(pago),
                     preference.getInitPoint(),
-                    preference.getSandboxInitPoint(),
-                    false);
-        } catch (Throwable t) {
-            log.error("Error general en preferencia: ", t);
-            try {
-                org.springframework.transaction.interceptor.TransactionAspectSupport
-                        .currentTransactionStatus()
-                        .setRollbackOnly();
-            } catch (Exception ignored) {
-                // Sin transacción activa: se devuelve el DTO simulado.
-            }
-            return PagoResponse.builder()
-                    .ordenId(request.getOrdenId())
-                    .estadoPago("PENDIENTE")
-                    .modoSimulacion(true)
-                    .build();
+                    preference.getSandboxInitPoint());
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("No se pudo crear la preferencia real de Mercado Pago: ", e);
+            throw new IllegalStateException(
+                    "No se pudo conectar con Mercado Pago. Verifica el Access Token de Prueba.", e);
         }
-    }
-
-    @Transactional
-    public PagoResponse confirmarSimulacion(String preferenceId) {
-        Pago pago = pagoRepository.findByPreferenceId(preferenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Pago no encontrado para preference: " + preferenceId));
-        String estadoAnterior = pago.getEstadoPago();
-        pago.setEstadoPago("PROCESADO");
-        pago.setFechaPago(LocalDateTime.now());
-        Pago guardado = pagoRepository.save(pago);
-        publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
-        String url = urlSimulacion(preferenceId);
-        return pagoMapper.toResponse(guardado, url, url, true);
-    }
-
-    @Transactional
-    public PagoResponse confirmarBilletera(Long ordenId) {
-        Pago pago = pagoRepository.findFirstByOrdenId(ordenId)
-                .orElseThrow(() -> new ResourceNotFoundException("Pago no encontrado para la orden: " + ordenId));
-        if (!esBilletera(pago.getMetodoPago())) {
-            throw new IllegalStateException("Solo se confirman por este paso los pagos Yape o Plin");
-        }
-        if ("PROCESADO".equals(pago.getEstadoPago())) {
-            return pagoMapper.toResponse(pago);
-        }
-        String estadoAnterior = pago.getEstadoPago();
-        pago.setEstadoPago("PROCESADO");
-        pago.setFechaPago(LocalDateTime.now());
-        Pago guardado = pagoRepository.save(pago);
-        publicarEventoSiCambioDeEstado(guardado, estadoAnterior);
-        return pagoMapper.toResponse(guardado);
     }
 
     @Transactional
@@ -291,34 +228,6 @@ public class PagoService {
             default -> log.debug("Pago {} quedó en estado {}; no se publica evento de SAGA",
                     pago.getId(), pago.getEstadoPago());
         }
-    }
-
-    private PagoResponse guardarSimulacion(PagoRequest request, String metodoPago, Pago existente) {
-        Pago pago = existente != null ? existente : Pago.builder().build();
-        pago.setOrdenId(request.getOrdenId());
-        if (request.getMonto() != null) {
-            pago.setMonto(request.getMonto());
-        }
-        pago.setMetodoPago(metodoPago);
-        pago.setEstadoPago("PENDIENTE");
-        pago.setFechaPago(LocalDateTime.now());
-
-        if (esEfectivo(metodoPago)) {
-            return pagoMapper.toResponse(pagoRepository.save(pago));
-        }
-
-        String preferenceId = mercadoPagoProperties.getSimulationIdPrefix() + UUID.randomUUID();
-        String url = urlSimulacion(preferenceId);
-        pago.setPreferenceId(preferenceId);
-        return pagoMapper.toResponse(pagoRepository.save(pago), url, url, true);
-    }
-
-    private String urlSimulacion(String preferenceId) {
-        String base = mercadoPagoProperties.getSimulationBaseUrl();
-        if (base.endsWith("/")) {
-            return base + preferenceId;
-        }
-        return base + "/" + preferenceId;
     }
 
     private Preference crearPreferenceMercadoPago(PagoRequest request) {
@@ -412,18 +321,6 @@ public class PagoService {
 
     private boolean esEfectivo(String metodoPago) {
         return metodoPago != null && METODO_EFECTIVO.equalsIgnoreCase(metodoPago.trim());
-    }
-
-    private boolean esBilletera(String metodoPago) {
-        if (metodoPago == null) {
-            return false;
-        }
-        String valor = metodoPago.trim().toUpperCase();
-        return METODO_YAPE.equals(valor) || METODO_PLIN.equals(valor);
-    }
-
-    private boolean esMercadoPago(String metodoPago) {
-        return metodoPago != null && METODO_MERCADOPAGO.equalsIgnoreCase(metodoPago.trim());
     }
 
     private Pago buscarOFallar(Long id) {

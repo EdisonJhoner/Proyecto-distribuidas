@@ -14,7 +14,7 @@ Sistema distribuido base funcional, configurable y preparado para múltiples ins
 | `qhalimenu-catalogo-ms` | Catálogo de categorías y productos (CRUD, no transaccional). | S1, S3 | Edison |
 | `qhalimenu-orden-ms` | Registro de órdenes de reserva (transaccional). | S1, S2-S4 | Jhosef |
 | `qhalimenu-cliente-ms` | Compra exprés: DNI + nombre + celular, sin registro ni contraseña. | S1-S4 | Jhosef |
-| `qhalimenu-pago-ms` | Preferencia MercadoPago o simulación sandbox si el token no es real. | S1-S4 | Edison |
+| `qhalimenu-pago-ms` | Preferencia real de Mercado Pago (checkout externo) y cobro en efectivo desde Caja. | S1-S4 | Edison |
 
 ## 2. Contrato REST
 
@@ -26,7 +26,7 @@ Todo el tráfico de negocio se resuelve a través de `qhalimenu-gateway` (`local
 | `GET`, `GET /{id}`, `POST`, `PUT`, `DELETE` | `/api/v1/productos` | CRUD de productos, con categoría anidada. |
 | `GET`, `GET /{id}`, `POST` | `/api/v1/ordenes` | Listar, consultar y registrar órdenes. |
 | `GET`, `GET /{id}`, `GET /documento/{dni}`, `POST`, `PUT`, `DELETE` | `/api/v1/clientes` | Asociación exprés por DNI (nombre + celular). PUT/DELETE para caja/entrega. |
-| `GET`, `GET /{id}`, `GET /orden/{ordenId}`, `POST /crear-preferencia`, `GET /simulacion/{preferenceId}`, `GET /feedback`, `GET|POST /webhook` | `/api/v1/pagos` | Preferencia MercadoPago o URL de simulación; confirmación y webhook. |
+| `GET`, `GET /{id}`, `GET /orden/{ordenId}`, `POST /crear-preferencia`, `POST /orden/{ordenId}/confirmar-efectivo`, `GET /feedback`, `GET|POST /webhook` | `/api/v1/pagos` | Preferencia real de Mercado Pago, cobro en efectivo, confirmación y webhook. |
 
 Errores: HTTP `400` (validación `@Valid`) y HTTP `404` (`ResourceNotFoundException`).
 

@@ -23,6 +23,9 @@ $token = $token.Trim()
 if ($token -notmatch '^(APP_USR|TEST)-') {
     Write-Error 'El token debe venir del selector "Prueba" (APP_USR-... o TEST-...). No uses un token de Producción.'
 }
+if ($token -eq 'TEST-TU-TOKEN-DE-PRUEBA' -or $token -like '*YOUR*ACCESS*TOKEN*' -or $token -like '*TU-TOKEN*') {
+    Write-Error 'El token sigue siendo un placeholder. Copia el Access Token real del selector "Prueba".'
+}
 
 $env:MERCADOPAGO_ACCESS_TOKEN = $token
 $prefijo = $token.Substring(0, [Math]::Min(9, $token.Length))

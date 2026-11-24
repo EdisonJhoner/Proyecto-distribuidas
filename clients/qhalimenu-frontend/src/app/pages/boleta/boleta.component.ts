@@ -47,10 +47,9 @@ export class BoletaComponent implements OnInit, OnDestroy {
   readonly esEntregada = computed(() => this.orden()?.estado === 'ENTREGADA');
   readonly esCancelada = computed(() => this.orden()?.estado === 'CANCELADA');
 
-  readonly metodoOrden = computed<MetodoPagoUI>(() => {
-    const metodo = this.orden()?.metodoPago;
-    return (['TARJETA', 'MERCADOPAGO', 'YAPE', 'PLIN', 'EFECTIVO'].includes(metodo ?? '') ? metodo : 'MERCADOPAGO') as MetodoPagoUI;
-  });
+  readonly metodoOrden = computed<MetodoPagoUI>(() =>
+    this.orden()?.metodoPago === 'EFECTIVO' ? 'EFECTIVO' : 'MERCADOPAGO'
+  );
 
   readonly metodoEsEfectivo = computed(() => this.metodoOrden() === 'EFECTIVO');
 
@@ -153,11 +152,16 @@ export class BoletaComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const ventanaPago = this.metodoOrden() === 'MERCADOPAGO'
+      ? window.open('', '_blank', 'popup,width=1100,height=800')
+      : null;
+
     this.pagando.set(true);
     this.errorPago.set(false);
     try {
-      const resultado = await this.pagoFlujo.pagar(orden, this.metodoOrden());
+      const resultado = await this.pagoFlujo.pagar(orden, this.metodoOrden(), ventanaPago);
       if (resultado.estado === 'REDIRIGIDO') {
+        this.toast.info('Pago en otra ventana', resultado.mensaje);
         return;
       }
       if (resultado.estado === 'PAGADA') {
@@ -170,6 +174,10 @@ export class BoletaComponent implements OnInit, OnDestroy {
       await this.router.navigate([], { queryParams: {}, replaceUrl: true });
       this.recienCreada.set(false);
     } catch (error) {
+      if (ventanaPago && !ventanaPago.closed) {
+        ventanaPago.location.href = `${window.location.origin}/boleta/${orden.id}?pagoError=1`;
+        ventanaPago.focus();
+      }
       this.toast.error('No se pudo completar el pago', mensajeHttp(error));
     } finally {
       this.pagando.set(false);
